@@ -1,6 +1,6 @@
 {
   "name": "leaflet-latlng-format",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "homepage": "https://github.com/FCOO/leaflet-latlng-format",
   "author": "Niels Holt nho@fcoo.dk",
   "description": "package.json is only use for building the package. see bower.json for more info",

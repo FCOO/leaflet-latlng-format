@@ -19,7 +19,7 @@
 		FORMAT_DD		: window.LATLNGFORMAT_DD,		//Decimal degrees													: N41.1234d
 		format			: new window.LatLngFormat( window.LATLNGFORMAT_DMSS ),
 		setFormat		: function( formatId ){ L.LatLng.format.setFormat( formatId ) },
-
+		changeFormat: function(){ this.setFormat( (this.format.options.formatId + 1) % (this.FORMAT_DD + 1) ); }
 	});
 
 
