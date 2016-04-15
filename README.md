@@ -29,8 +29,16 @@ http://FCOO.github.io/leaflet-latlng-format/demo/
 	L.LatLng.FORMAT_SMM		//Degrees Decimal minutes
 	L.LatLng.FORMAT_DD		//Decimal degrees
 
-	L.LatLng.setFormat( formatId ); //Swts the format to formatId
-	L.LatLng.changeFormat();		//Change the format to next format (FORMAT_DMSS -> FORMAT_SMM -> FORMAT_DD -> FORMAT_DMSS) 
+	L.LatLng.setFormat( formatId [, map] ); //Sets the format to formatId
+	L.LatLng.changeFormat([map]);           //Change the format to next format (FORMAT_DMSS -> FORMAT_SMM -> FORMAT_DD -> FORMAT_DMSS) 
+
+#### Event `latlngformatchange`
+if `map` is provided to `L.LatLng.setFormat` or `L.LatLng.changeFormat` a special event `latlngformatchange` is fired `map.fire('latlngformatchange', {format: L.LatLng.format});`
+
+E.g. 
+	map.on('latlngformatchange', function( data ){ ... }),
+where `data.format` is the current [LatLngFormat-object](https://github.com/FCOO/latlng-format) 
+
 
 ### L.LatLng.prototype
 `L.LatLng.prototype` is extended with tree methods and an object

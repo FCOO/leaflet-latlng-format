@@ -15,10 +15,10 @@
 
 <body>
 	<div id="map" style="width: 800px; height: 600px"></div>
-	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_DMSS );">Formast DMSs (N65&deg;30'15.3")</button>
-	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_SMM  );">Format DMm (N65&deg;30.258')</button>
-	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_DD   );">Format Dd (N41.1234&deg;)</button>
-	<button onClick="L.LatLng.changeFormat();">L.LatLng.changeFormat()</button>
+	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_DMSS, map );">Formast DMSs (N65&deg;30'15.3")</button>
+	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_SMM, map  );">Format DMm (N65&deg;30.258')</button>
+	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_DD, map   );">Format Dd (N41.1234&deg;)</button>
+	<button onClick="L.LatLng.changeFormat( map );">L.LatLng.changeFormat()</button>
 
 
 	
@@ -41,6 +41,10 @@
 			.openOn(map);
 		}
 		map.on('click', openPopup );			
+
+		map.on('latlngformatchange', function( data ){
+			console.log( data.format );
+		});			
 	</script>
 </body>
 </html>

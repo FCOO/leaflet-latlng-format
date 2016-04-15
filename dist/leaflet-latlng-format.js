@@ -18,8 +18,14 @@
 		FORMAT_SMM	: window.LATLNGFORMAT_DMM,	//Degrees Decimal minutes									:	N65d30.258'
 		FORMAT_DD		: window.LATLNGFORMAT_DD,		//Decimal degrees													: N41.1234d
 		format			: new window.LatLngFormat( window.LATLNGFORMAT_DMSS ),
-		setFormat		: function( formatId ){ L.LatLng.format.setFormat( formatId ) },
-		changeFormat: function(){ this.setFormat( (this.format.options.formatId + 1) % (this.FORMAT_DD + 1) ); }
+		setFormat		: function( formatId, map ){ 
+										L.LatLng.format.setFormat( formatId );
+										if (map)
+										  map.fireEvent('latlngformatchange', { format: this.format } );
+									},
+		changeFormat: function( map ){ 
+										this.setFormat( (this.format.options.formatId + 1) % (this.FORMAT_DD + 1), map ); 
+									}
 	});
 
 
