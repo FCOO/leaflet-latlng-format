@@ -37,7 +37,11 @@
 			var popup = L.popup();
 			popup
 				.setLatLng(e.latlng)
-				.setContent("You clicked the map at <br>toString= <code>" + e.latlng.toString()+'</code><br>asFormat= <code style="background-color:gray; color:white">'+e.latlng.latAsFormat() + ' '+e.latlng.lngAsFormat()+'</code>')
+				.setContent('You clicked the map at <br>'+
+                            'toString= <code>' + e.latlng.toString()+'</code><br>' +
+                            '<code>latFormat()= </code><code style="background-color:gray; color:white">'+e.latlng.latFormat()+'</code><br>' +
+                            '<code>lngFormat()= </code><code style="background-color:gray; color:white">'+e.latlng.lngFormat()+'</code>'
+                            )
 			.openOn(map);
 		}
 		map.on('click', openPopup );			

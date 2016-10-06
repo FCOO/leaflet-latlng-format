@@ -1,13 +1,13 @@
 {
   "name": "leaflet-latlng-format",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "homepage": "https://github.com/FCOO/leaflet-latlng-format",
   "authors": [
     "Niels Holt nho@fcoo.dk"
   ],
   "description": "",
   "main": [
-    "dist/leaflet-latlng-format.min.js"
+    "dist/leaflet-latlng-format.js"
   ],
   "repository": {
     "type": "git",
