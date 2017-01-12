@@ -10,17 +10,13 @@
 	<meta name='owner' content='FCOO'>
 
   <link  href="bower_components.css" rel="stylesheet">	
-  <link  href="../src/leaflet-latlng-format.css" rel="stylesheet">	
 </head>
 
 <body>
 	<div id="map" style="width: 800px; height: 600px"></div>
-	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_DMSS, map );">Formast DMSs (N65&deg;30'15.3")</button>
-	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_SMM, map  );">Format DMm (N65&deg;30.258')</button>
-	<button onClick="L.LatLng.setFormat( L.LatLng.FORMAT_DD, map   );">Format Dd (N41.1234&deg;)</button>
-	<button onClick="L.LatLng.changeFormat( map );">L.LatLng.changeFormat()</button>
-
-
+	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_DMSS );">Formast DMSs (N65&deg;30'15.3")</button>
+	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_SMM  );">Format DMm (N65&deg;30.258')</button>
+	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_DD   );">Format Dd (N41.1234&deg;)</button>
 	
 	
 	<script src="bower_components.js"></script>
@@ -39,16 +35,13 @@
 				.setLatLng(e.latlng)
 				.setContent('You clicked the map at <br>'+
                             'toString= <code>' + e.latlng.toString()+'</code><br>' +
-                            '<code>latFormat()= </code><code style="background-color:gray; color:white">'+e.latlng.latFormat()+'</code><br>' +
-                            '<code>lngFormat()= </code><code style="background-color:gray; color:white">'+e.latlng.lngFormat()+'</code>'
+                            '<code>formatLat()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLat()+'</code><br>' +
+                            '<code>formatLng()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLng()+'</code>'
                             )
 			.openOn(map);
 		}
 		map.on('click', openPopup );			
 
-		map.on('latlngformatchange', function( data ){
-			console.log( data.format );
-		});			
 	</script>
 </body>
 </html>
