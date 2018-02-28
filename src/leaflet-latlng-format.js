@@ -21,7 +21,12 @@
     L.extend( L.LatLng.prototype, {
         formatLat: function(){ return window.latLngFormat( this.lat ).formatLat(); },
         formatLng: function(){ return window.latLngFormat( this.lng ).formatLng(); },
-        format   : function(){ return window.latLngFormat( this.lat, this.lng ).format(); }
+        format   : function(){ return window.latLngFormat( this.lat, this.lng ).format(); },
+
+        formatTruncLat: function(){ return window.latLngFormat( this.lat ).formatTruncLat(); },
+        formatTruncLng: function(){ return window.latLngFormat( this.lng ).formatTruncLng(); },
+        formatTrunc   : function(){ return window.latLngFormat( this.lat, this.lng ).formatTrunc(); }
+
     });
 
 }(L, this, document));

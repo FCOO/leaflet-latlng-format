@@ -1,6 +1,6 @@
 {
   "name": "leaflet-latlng-format",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "homepage": "https://github.com/FCOO/leaflet-latlng-format",
   "authors": [
     "Niels Holt nho@fcoo.dk"
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "leaflet": "latest",
-    "latlng-format": "fcoo/latlng-format#^2.0.0"
+    "latlng-format": "fcoo/latlng-format#^2.1.0"
   },
   "devDependencies": {},
   "license": "MIT",

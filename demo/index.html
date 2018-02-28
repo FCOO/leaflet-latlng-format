@@ -9,7 +9,7 @@
 	<meta name='copyright' content='FCOO'>
 	<meta name='owner' content='FCOO'>
 
-  <link  href="bower_components.css" rel="stylesheet">	
+  <link  href="bower_components.css" rel="stylesheet">
 </head>
 
 <body>
@@ -17,8 +17,8 @@
 	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_DMSS );">Formast DMSs (N65&deg;30'15.3")</button>
 	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_SMM  );">Format DMm (N65&deg;30.258')</button>
 	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_DD   );">Format Dd (N41.1234&deg;)</button>
-	
-	
+
+
 	<script src="bower_components.js"></script>
 	<script src="../src/leaflet-latlng-format.js"></script>
 
@@ -36,11 +36,13 @@
 				.setContent('You clicked the map at <br>'+
                             'toString= <code>' + e.latlng.toString()+'</code><br>' +
                             '<code>formatLat()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLat()+'</code><br>' +
-                            '<code>formatLng()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLng()+'</code>'
+                            '<code>formatTruncLat()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatTruncLat()+'</code><br>' +
+                            '<code>formatLng()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLng()+'</code><br>' +
+                            '<code>formatTruncLng()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatTruncLng()+'</code>'
                             )
 			.openOn(map);
 		}
-		map.on('click', openPopup );			
+		map.on('click', openPopup );
 
 	</script>
 </body>
