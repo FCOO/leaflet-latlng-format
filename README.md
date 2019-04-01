@@ -13,9 +13,9 @@ Extension to `L.LatLng` to format lat,lng as text using [fcoo/latlng-format](htt
 http://FCOO.github.io/leaflet-latlng-format/demo/ 
 
 ## Usage
+
     var myLatLng = L.LatLng(54.25239, 9.646);
-    console.log( myLatLng.formatLat() ); //54°15'08,6"N
-    console.log( myLatLng.formatLng() ); //9°38'45,5"E
+    console.log( myLatLng.format() ); //54°15'08,6"N 9°38'45,5"E
 
     L.LatLng.setFormat( latLngFormat.FORMAT_SMM    ); //Change format to Degrees Decimal minutes (N65 30.258')    
 
@@ -27,11 +27,10 @@ http://FCOO.github.io/leaflet-latlng-format/demo/
     L.LatLng.setFormat( formatId ); //Sets the format to formatId
 
 ### L.LatLng.prototype
-`L.LatLng.prototype` is extended with tree methods
+`L.LatLng.prototype` is extended with two methods
 
-    .formatLat()    //return this.lat formatted
-    .formatLng()    //return this.lng formatted
-    .format()       //return [this.formatLat(), this.formatLng()]
+    .format()       //return this formated to selected format
+    .formatTrunc()  //return this formated to truncated selected format()]
 
 ## Copyright and License
 This plugin is licensed under the [MIT license](https://github.com/FCOO/leaflet-latlng-format/LICENSE).

@@ -10364,6 +10364,268 @@ return jQuery;
 } );
 
 ;
+/****************************************************************************
+    color.js,
+    Functions to caluclate the brightness of a color
+    Taken from http://codepen.io/lunelson/pen/jENxwB
+
+****************************************************************************/
+
+(function (window/*, document, undefined*/) {
+    "use strict";
+
+    //Create fcoo-namespace
+    var nsColor = window;
+
+
+    function lin2log(n) {
+        if (n <= 0.0031308)
+            return n * 12.92;
+        else
+            return 1.055 * Math.pow(n,1/2.4) - 0.055;
+    }
+
+    function log2lin(n) {
+        if (n <= 0.04045)
+            return n / 12.92;
+        else
+            return Math.pow(((n + 0.055)/1.055),2.4);
+    }
+
+    /********************************************
+    brightness
+    ********************************************/
+    nsColor.brightness = function brightness(r, g, b) {
+        r = log2lin(r/255);
+        g = log2lin(g/255);
+        b = log2lin(b/255);
+        return lin2log(0.2126 * r + 0.7152 * g + 0.0722 * b) * 100;
+    };
+
+    /********************************************
+    colorContrastHEX
+    ********************************************/
+    nsColor.colorContrastHEX = function colorContrastHEX( color ) {
+        if (color.length === 3)
+            color = color.charAt(0) + color.charAt(0) + color.charAt(1) + color.charAt(1) + color.charAt(2) + color.charAt(2);
+        var rgb = [];
+        for (var i = 0; i <= 2; i++)
+            rgb[i] = parseInt(color.substr(1+i*2, 2), 16);
+        return nsColor.colorContrastRGB(rgb[0], rgb[1], rgb[2]);
+    };
+
+    /********************************************
+    colorContrastRGB
+    ********************************************/
+    nsColor.colorContrastRGB = function colorContrastRGB(r, g, b) {
+        var colorBrightness = nsColor.brightness(r, g, b),
+                whiteBrightness = nsColor.brightness(255, 255, 255),
+                blackBrightness = nsColor.brightness(0, 0, 0);
+        return Math.abs(colorBrightness - whiteBrightness) > Math.abs(colorBrightness - blackBrightness) ? '#ffffff' : '#000000';
+    };
+
+    /********************************************
+    rgbHex
+    Convert RGB color to HEX
+    From https://github.com/sindresorhus/rgb-hex
+    ********************************************/
+    nsColor.rgbHex = function(red, green, blue, alpha){
+        var isPercent = (red + (alpha || '')).toString().includes('%');
+
+        if (typeof red === 'string') {
+            var res = red.match(/(0?\.?\d{1,3})%?\b/g).map(Number);
+            red = res[0];
+            green = res[1];
+            blue = res[2];
+            alpha = res[3];
+        }
+        else
+            if (alpha !== undefined) {
+                alpha = parseFloat(alpha);
+            }
+
+        if (typeof red !== 'number' ||
+            typeof green !== 'number' ||
+            typeof blue !== 'number' ||
+            red > 255 ||
+            green > 255 ||
+            blue > 255) {
+                throw new TypeError('Expected three numbers below 256');
+        }
+
+        if (typeof alpha === 'number') {
+            if (!isPercent && alpha >= 0 && alpha <= 1) {
+                alpha = Math.round(255 * alpha);
+            }
+            else
+                if (isPercent && alpha >= 0 && alpha <= 100) {
+                    alpha = Math.round(255 * alpha / 100);
+                }
+                else {
+                    throw new TypeError('Expected alpha value (${alpha}) as a fraction or percentage');
+                }
+            alpha = (alpha | 1 << 8).toString(16).slice(1);
+        }
+        else {
+            alpha = '';
+        }
+
+        return ((blue | green << 8 | red << 16) | 1 << 24).toString(16).slice(1) + alpha;
+    };
+
+    /********************************************
+    hexRgb
+    Convert HEX color to RGB
+    From https://github.com/sindresorhus/hex-rgb
+    ********************************************/
+    var hexChars = 'a-f\\d',
+        match3or4Hex = '#?[' + hexChars + ']{3}[' + hexChars + ']?',
+        match6or8Hex = '#?[' + hexChars + ']{6}([' + hexChars + ']{2})?',
+        nonHexChars = new RegExp('[^#' + hexChars + ']', 'gi'),
+        validHexSize = new RegExp('^' + match3or4Hex + '$|^' + match6or8Hex + '$', 'i');
+
+    nsColor.hexRgb = function(hex, options) {
+        options = options || {};
+        if (typeof hex !== 'string' || nonHexChars.test(hex) || !validHexSize.test(hex)) {
+            throw new TypeError('Expected a valid hex string');
+        }
+
+        hex = hex.replace(/^#/, '');
+        var alpha = 255;
+
+        if (hex.length === 8) {
+            alpha = parseInt(hex.slice(6, 8), 16) / 255;
+            hex = hex.substring(0, 6);
+        }
+
+        if (hex.length === 4) {
+            alpha = parseInt(hex.slice(3, 4).repeat(2), 16) / 255;
+            hex = hex.substring(0, 3);
+        }
+
+        if (hex.length === 3) {
+            hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+        }
+
+        var num = parseInt(hex, 16),
+            red = num >> 16,
+            green = (num >> 8) & 255,
+            blue = num & 255;
+
+        return options.format === 'array' ? [red, green, blue, alpha] : { red: red, green: green, blue: blue, alpha: alpha };
+    };
+
+    /********************************************
+    hexSetAlpha
+    Set the alpha-value in a hex-color
+    ********************************************/
+    nsColor.hexSetAlpha = function(hex, alpha){
+        var rgba = nsColor.hexRgb(hex, {format: 'array'});
+        rgba[3] = alpha;
+        return nsColor.rgbHex.apply(this, rgba);
+    };
+
+}(this, document));
+;
+/****************************************************************************
+    json.js,
+****************************************************************************/
+
+(function (window/*, document, undefined*/) {
+    "use strict";
+
+    //Create fcoo-namespace
+    var nsJSON = window;
+
+    /******************************************
+    serializeJSON
+    Converts a json-object a la {id1:'value1', id2:'value2'}
+    to [ { name: "id1", value: "value1" }, { name: "id2", value: "value2" } ]
+    *******************************************/
+    nsJSON.serializeJSON = function( jsonObj ){
+        var result = [];
+        for (var id in jsonObj)
+            if (jsonObj.hasOwnProperty(id))
+                result.push( {name: id, value: jsonObj[id] });
+        return result;
+    };
+
+
+}(this, document));
+;
+/****************************************************************************
+    math.js,
+
+****************************************************************************/
+
+(function (window/*, document, undefined*/) {
+    "use strict";
+
+    var nsMath = window;
+
+    /*******************************************
+    significant - return n rounded to significant sf
+    *******************************************/
+    nsMath.significant = function significant(n, sf) {
+        sf = sf - Math.floor(Math.log(n) / Math.LN10) - 1;
+        sf = Math.pow(10, sf);
+        n = Math.round(n * sf);
+        n = n / sf;
+        return n;
+    };
+
+    /*******************************************
+    precision
+    *******************************************/
+    nsMath.precision = function precision(n, dp) {
+        dp = Math.pow(10, dp);
+        n = n * dp;
+        n = Math.round(n);
+        n = n / dp;
+        return n;
+    };
+
+    /*******************************************
+    nearest
+    *******************************************/
+    nsMath.nearest = function nearest(n, v) {
+        v = v ? v : 1;
+        n = n / v;
+        n = Math.round(n) * v;
+        return n;
+    };
+
+    /*******************************************
+    roundDownTo
+    *******************************************/
+    nsMath.roundDownTo = function roundDownTo(n, v) {
+        v = v ? v : 1;
+        n = n / v;
+        n = Math.floor(n) * v;
+        return n;
+    };
+
+    /*******************************************
+    roundToRange
+    *******************************************/
+    nsMath.roundToRange = function roundToRange(v, min, max) {
+        return Math.max( Math.min(v, max), min);
+    };
+
+    /*******************************************
+    toDecimal
+    Convert a integer value v to a decimal
+    Eq    toDecimal(89)        = 0.89
+            toDecimal(9)        = 0.9
+            toDecimal(1234)    = 0.1234
+    *******************************************/
+    nsMath.toDecimal = function toDecimal(v) {
+        var l = v.toString().length;
+        return v / Math.pow(10, l);
+    };
+
+}(this, document));
+;
 /*! @preserve
  * numeral.js
  * version : 2.0.6
@@ -11380,7 +11642,7 @@ return numeral;
 
 ;
 /****************************************************************************
-latlng-format, a class to validate, format, and transform positions (eq. leaflet LatLng)
+latlng-format-base, a class to validate, format, and transform positions (eq. leaflet LatLng)
 
     (c) 2015, FCOO
 
@@ -11389,292 +11651,371 @@ latlng-format, a class to validate, format, and transform positions (eq. leaflet
 
 ****************************************************************************/
 
-(function ($, window/*, document, undefined*/) {
+(function ($, window, document, undefined) {
     "use strict";
 
-    //Options for the tree posible formats. Placed in seperate namespace
-    var LATLNGFORMAT_DMSS = 0, //Degrees Minutes Seconds Decimal Seconds: N65d30'15.3"  d='degree sign'
-        LATLNGFORMAT_DMM  = 1, //Degrees Decimal minutes                : N65d30.258'
-        LATLNGFORMAT_DD   = 2; //Decimal degrees                        : N41.1234d
-
-    // _split - Input: position (number) Return: {hemisphere, degrees, degreesDecimal, minutes, minutesDecimal, seconds, secondsDecimal}
-    function _split( position ){
-        var result = {};
-        result.hemisphere = position >= 0 ? +1 : -1;
-        position = Math.abs(position);
-        result.degrees = Math.floor(position);
-        result.degreesDecimal = Math.min(9999, Math.round((position - result.degrees)*10000) );
-
-        position = position*60 % 60; //Minutes
-        result.minutes = Math.floor(position);
-        result.minutesDecimal = Math.min( 999, Math.round((position - result.minutes)*1000) );
-
-        position = position*60 % 60; //seconds
-        result.seconds = Math.floor(position);
-        result.secondsDecimal = Math.min( 9, Math.floor/*round*/((position - result.seconds)*10) );
-
-
-        return result;
-    }
-
-    var latLngFormat;
-
-
-    /************************************
-    Constructors
-    ************************************/
-
-    // LatlngFormat prototype object
-    function LatLngFormat( inputs ){
-        this._inputs = inputs;
-        this.inputIsValid = (this._inputs !== null);
-        this.inputIsSingle = this.inputIsValid && (this._inputs.length == 1);
-
-
-        if (!this.inputIsValid && console.warn)
-            console.warn('latLngFormat: Invalid arguments');
-    }
-
-
-    latLngFormat = function() {
-        //Possible arguments: ( Number ), ( Number, Number ) ( [Number, Number] ), ( String ), ( String, String ) ( [String, String] )
-        var inputs = null,
-            inputValid = false;
-        if (arguments.length && (arguments.length <= 2)){
-            if (arguments.length == 1){
-                if ($.isArray(arguments[0]))
-                    inputs = arguments[0];
-                else
-                    inputs = [ arguments[0] ];
-            }
-            if (arguments.length == 2)
-              inputs = [ arguments[0], arguments[1] ];
-
-            inputValid = true;
-            $.each( inputs, function( index, val ){
-                if ((typeof val != 'number') && (typeof val != 'string')){
-                    inputValid = false;
-                    return false;
-                }
-            });
-        }
-        return new LatLngFormat( inputValid ? inputs : null );
+    /*******************************************************
+    window.latLngFormat =
+    constructor of LatLngFormat, and
+    holder of global options and methods
+    ********************************************************/
+    var latLngFormat = function( arg0, arg1 ) {
+        return new LatLngFormat( arg0, arg1 );
     };
 
-    //Defalut options
-    latLngFormat.options = {
-        degreeChar: '&#176;', //or '&deg;'
+    //Options for the posible formats. Placed in seperate namespace
+    latLngFormat.LATLNGFORMAT_DMSS = 0; //Degrees Minutes Seconds Decimal Seconds: N65d30'15.3"  d='degree sign'
+    latLngFormat.LATLNGFORMAT_DMM  = 1; //Degrees Decimal minutes                : N65d30.258'
+    latLngFormat.LATLNGFORMAT_DD   = 2; //Decimal degrees                        : N41.1234d
+
+    latLngFormat.LATLNGFORMAT_UTM  = 3; //UTM                                    : 29Q 286657 2492164
+    latLngFormat.LATLNGFORMAT_MGRS = 4; //MGRS                                   : 02U PG 03727 09686
+    latLngFormat.LATLNGFORMAT_NAC  = 5; //NAC                                    : HBV6R RG77T.
+
+
+    latLngFormat.LATLNGFORMAT_FIRST = latLngFormat.LATLNGFORMAT_DMSS;
+    latLngFormat.LATLNGFORMAT_LAST  = latLngFormat.LATLNGFORMAT_NAC;
+
+
+    //Default options
+    var defaultOptions = {
+        twoValueMode: false, //If true the different methods are called on lat and lng individually
+
+        degreeChar  : String.fromCharCode(176), //or '&#176;' '&deg;'
+
+        preText     : '',
+        separator   : ' ',
+        postText    : '',
+
              //lat, lng
         min: [-90, -180],
         max: [ 90,  180]
     };
-    latLngFormat.LATLNGFORMAT_DMSS = LATLNGFORMAT_DMSS;
-    latLngFormat.LATLNGFORMAT_DMM  = LATLNGFORMAT_DMM;
-    latLngFormat.LATLNGFORMAT_DD   = LATLNGFORMAT_DD;
 
+    latLngFormat.options = $.extend({}, defaultOptions);
 
-    /************************************
-    LatlngFormat Prototype
-    ************************************/
-    latLngFormat.fn = LatLngFormat.prototype = {
-        _getLat: function(){ return this._inputs[0]; },
-        _getLng: function(){ return this.inputIsSingle ? this._inputs[0] : this._inputs[1]; },
-
-        //_method - call this.method with correct parametre. method = function( regexpIndex,  value [, extraParam] ): return (Boolean|Number|String)
-        _method   : function (method, param1, param2) { return [ method.call( this, 0, this._getLat(), param1, param2 ), method.call( this, 1, this._getLng(), param1, param2 ) ]; },
-        _methodLat: function (method, param1, param2) { return method.call( this, 0, this._getLat(), param1, param2 ); },
-        _methodLng: function (method, param1, param2) { return method.call( this, 1, this._getLng(), param1, param2 ); },
-
-        //**********************************************************
-        //_valid - Return true if the value is a valid position
-        _valid: function(latOrLng, value){
-            if (typeof value == 'number')
-                return (value >= latLngFormat.options.min[latOrLng]) && (value <= latLngFormat.options.max[latOrLng]);
-            else
-                //The regexp is prefixed with ^(?: and suffixed with )$ to make it full-match-only.
-                return (new RegExp( '^(?:' + latLngFormat.options.regexp[latOrLng] + ')$' )).test(value);
-        },
-
-        //valid - Return true if the input is a valid position
-        valid   : function(){ return this._method( this._valid ); },
-        validLat: function(){ return this._methodLat( this._valid ); },
-        validLng: function(){ return this._methodLng( this._valid ); },
-
-        //**********************************************************
-        //_format - Converts value to a string, using this.displayMask or this.editMask
-        _format: function(latOrLng, value, useEditMask, trunc){
-
-            function trim(value, lgd){
-                var result = ''+value;
-                if (trunc){
-                    if (value == 0)
-                        result = '';
-                }
-                else
-                    while (result.length < lgd)
-                        result = '0'+result;
-                return result;
-            }
-            function append(value, lgd){
-                var result = ''+value;
-                if (trunc)
-                    result = result.replace( /0*$/g, '');
-                else
-                    while (result.length < lgd)
-                        result = result+'0';
-                return result;
-            }
-
-            if (typeof value == 'string')
-                return this._valid(latOrLng, value) ? value : '';
-
-            var parts = _split(value);
-
-            var result = (useEditMask ? latLngFormat.options.editMask : latLngFormat.options.displayMask)
-                            .replace('H', latOrLng ?
-                                            (parts.hemisphere == 1 ? 'E' : 'W') :
-                                            (parts.hemisphere == 1 ? 'N' : 'S')
-                            );
-
-            result = result.replace(/DDD/ , parts.degrees                   );
-            result = result.replace(/dddd/, append(parts.degreesDecimal, 4) );
-            result = result.replace(/MM/  , trim(parts.minutes,          2) );
-            result = result.replace(/mmm/ , append(parts.minutesDecimal, 3) );
-            result = result.replace(/SS/  , trim(parts.seconds,          2) );
-            result = result.replace(/s/   , trim(parts.secondsDecimal,   1) );
-
-            if (trunc){
-                //Remove delimiters not followed by a digit
-                result = result.replace( new RegExp('\\'+latLngFormat.options.delimitersDecimal + '(?![0-9])', 'g'), '');
-
-                /*
-                Remove sign for minute (') and seconds (") without pending digital
-                Using regExp result = result.replace( /(?<!\d)[\'\"]/g, ''); works but JavaScript do not support 'before': < so
-                a workaround is used
-                */
-                var i = 1;
-                while (i < result.length)
-                    if ( ((result.charAt(i) == '"') || (result.charAt(i) == "'")) &&
-                         !$.isNumeric(result.charAt(i-1))
-                       )
-                        result = result.slice(0,i) + result.slice(i+1);
-                    else
-                        i++;
-            }
-
-            return result;
-        },
-        //format - Converts number value to a string, using this.displayMask or this.editMask
-        format   : function( useEditMask ){ return this._method(    this._format, useEditMask ); },
-        formatLat: function( useEditMask ){ return this._methodLat( this._format, useEditMask ); },
-        formatLng: function( useEditMask ){ return this._methodLng( this._format, useEditMask ); },
-
-        //formatTrunc - Converts number value to a string, truncating any zero-values
-        formatTrunc   : function(){ return this._method(    this._format, false, true ); },
-        formatTruncLat: function(){ return this._methodLat( this._format, false, true ); },
-        formatTruncLng: function(){ return this._methodLng( this._format, false, true ); },
-
-
-        //**********************************************************
-        //_ value - Converts value (string masked as editMask) to decimal degrees.
-        //Using convertMask to convert the different part of the text. Any space is ignored
-        _value: function(latOrLng,  value){
-            //toDecimal - Convert a integer value v to a decimal. Eq    toDecimal(89)    = 0.89, toDecimal(9) = 0.9, toDecimal(1234)    = 0.1234
-            function toDecimal(v) {
-                var l = v.toString().length;
-                return v / Math.pow(10, l);
-            }
-
-            if (typeof value != 'string')
-              return value;
-
-            value = value.toUpperCase().trim();
-
-            //Convert N or E to +1 and S or W to -1
-            var sign = 1;
-            if ( (value.indexOf('S') > -1) || (value.indexOf('W') > -1) )
-                sign = -1;
-
-            //Remove all no-digital charts
-            value = value.replace(/\D+/g, ' ');
-
-            if ((value === '') || !this._valid(latOrLng,  value))
-                return null;
-
-            var split = value.split(/\D/),
-                result = 0,
-                convertMaskIndex = 0,
-                i, nextValue;
-            for (i=0; i<split.length; i++ ){
-                nextValue = parseInt(split[i]);
-                if (!isNaN(nextValue)){
-                    switch (latLngFormat.options.convertMask[convertMaskIndex]){
-                        case 'DDD' : result = result + nextValue;                 break;
-                        case 'MM'  : result = result + nextValue/60;              break;
-                        case 'mmm' : result = result + toDecimal(nextValue)/60;   break;
-                        case 's'   : result = result + toDecimal(nextValue)/3600; break;
-                        case 'SS'  : result = result + nextValue/3600;            break;
-                        case 'dddd': result = result + toDecimal(nextValue);      break;
-                    }
-                    convertMaskIndex++;
-                    if (convertMaskIndex >= latLngFormat.options.convertMask.length)
-                        break;
-                }
-            }
-            return sign*result;
-        },
-        //value - Converts value (string masked as editMask) to decimal degrees.
-        value   : function(){ return this._method( this._value ); },
-        valueLat: function(){ return this._methodLat( this._value ); },
-        valueLng: function(){ return this._methodLng( this._value ); },
-
-
-        //**********************************************************
-        //_convert - If value is valid string in orgLatlngFormat => convert it to this' format and return it as text-string, else return original input-string
-        _convert: function( latOrLng, value, orgFormatId ){
-            if (typeof value != 'string')
-              return value;
-
-            if (orgFormatId){
-                //Change to original format
-                var formatId = latLngFormat.options.formatId;
-                latLngFormat.setFormat( orgFormatId );
-
-                if (this._valid( latOrLng, value )){
-                    var numberValue = this._value( latOrLng, value );
-
-                    //Reset format
-                    latLngFormat.setFormat( formatId );
-
-                    //Convert to current format
-                    value = this._format( latOrLng, numberValue, true/*useEditMask*/);
-                }
-                else
-                    //Reset format
-                    latLngFormat.setFormat( formatId );
-            }
-            return value;
-        },
-        //convert - If value is valid in orgLatlngFormat => convert it to this' format and return it as text-string, else return original input-string
-        convert   : function( orgLatLngFormat ){ return this._method( this._convert, orgLatLngFormat ); },
-        convertLat: function( orgLatLngFormat ){ return this._methodLat( this._convert, orgLatLngFormat ); },
-        convertLng: function( orgLatLngFormat ){ return this._methodLng( this._convert, orgLatLngFormat ); },
-
-
-    };//end of latLngFormat.fn = LatLngFormat.prototype = {
+    /*
+    latLngFormatList = list of different formats
+    latLngFormatList = [id] of {
+        getOptions: function()                             //Return the different options for the format. If
+        format    : function(value of [lat,lng], options, latLngFormat) //Return formated string of value/[lat,lng]
+        value     : function(String, options, latLngFormat) //Convert String from current string-format to latlng-value
+    }
+    */
+    latLngFormat.formatList = {};
 
 
     /************************************
     Static methods
     ************************************/
     $.extend( latLngFormat, {
-        //setFormat
-        setFormat: function( formatId ){
-            if (formatId !== null)
-              this.options.formatId = formatId;
 
+        /************************************
+        _callMethodFromFormatList
+        ************************************/
+        _callMethodFromFormatList: function( methodId, _this, arg ){
+            var formatId = this.options.formatId;
+            if (formatId === undefined)
+                return '';
+
+            if (this.formatList && this.formatList[formatId] && this.formatList[formatId][methodId])
+                return this.formatList[formatId][methodId].apply(_this || this, arg);
+            else {
+                if (window.console && window.console.warn)
+                    window.console.warn('latLngFormat: Missing '+methodId);
+                return '';
+            }
+        },
+
+        /************************************
+        setFormat
+        ************************************/
+        setFormat: function( formatId ){
+            if (formatId !== undefined)
+                this.options.formatId = formatId;
+
+            formatId = this.options.formatId;
+
+            //Reset to default options
+            this.options = $.extend({}, this.options, defaultOptions );
+
+            //Try to get delimiters from current locale in numeral
+            var dS = '.',
+                n = window.numeral,
+                n_localeData = n && n.localeData ? n.localeData() : null,
+                n_delimiters_decimal = n_localeData && n_localeData.delimiters && n_localeData.delimiters.decimal ? n_localeData.delimiters.decimal : null;
+
+            if (n_delimiters_decimal)
+              dS = n_delimiters_decimal;
+            else {
+                var S = Number(1.1).toLocaleString();
+                dS = S.indexOf('.') > -1 ? '.' :
+                     S.indexOf(',') > -1 ? ',' :
+                     '.';
+            }
+            this.options.delimitersDecimal = dS;
+
+            //Get new options
+            var newOptions = {};
+
+            newOptions = this._callMethodFromFormatList('getOptions', null, [formatId]);
+            if (newOptions){
+                //Adjust options. If convertMask, regexp, or placeholder isn't a array => convert
+                $.each(['displayMask', 'editMask', 'convertMask', 'regexp', 'placeholder'], function(index, id){
+                    newOptions[id] = newOptions[id] || '';
+                });
+                $.each(['convertMask', 'regexp', 'placeholder'], function(index, id){
+                    if (!$.isArray(newOptions[id]))
+                        newOptions[id] = [newOptions[id], newOptions[id]];
+                });
+                $.extend( this.options, newOptions );
+            }
+
+            return formatId;
+        }, //end of setFormat
+
+
+        /************************************
+        split
+            Input: position (number)
+            Return: {hemisphere, degrees, degreesDecimal, minutes, minutesDecimal, seconds, secondsDecimal}
+        ************************************/
+        split: function( position ){
+            var result = {};
+            result.hemisphere = position >= 0 ? +1 : -1;
+            position = Math.abs(position);
+            result.degrees = Math.floor(position);
+            result.degreesDecimal = Math.min(9999, Math.round((position - result.degrees)*10000) );
+
+            position = position*60 % 60; //Minutes
+            result.minutes = Math.floor(position);
+            result.minutesDecimal = Math.min( 999, Math.round((position - result.minutes)*1000) );
+
+            position = position*60 % 60; //seconds
+            result.seconds = Math.floor(position);
+            result.secondsDecimal = Math.min( 9, Math.floor/*round*/((position - result.seconds)*10) );
+
+            return result;
+        }
+
+    }); //end of $.extend( latLngFormat, {
+
+    // expose access to the constructor
+    window.latLngFormat = latLngFormat;
+
+    //Overwrite numeral.js method locale to update format with new decimal delimiters
+    var n = window.numeral;
+    if (n && n.locale)
+        n.locale = function( locale ){
+            return function(){
+                //Original function
+                var result = locale.apply(this, arguments);
+
+                //Update format
+                window.latLngFormat.setFormat();
+
+                return result;
+            };
+        }( n.locale );
+
+    /************************************
+    Constructors
+    ************************************/
+    // LatlngFormat prototype object
+    function LatLngFormat( arg0, arg1 ){
+        /*
+        Possible arguments:
+            ( Number )                                   => this._inputs = [ Number0, Number0 ]
+            ( Number0, Number1 ), ( [Number0, Number1] ) => this._inputs = [ Number0, Number1 ]
+            ( String ), ( String0, String1 ) ( [String0, String1] ) => this._inputs = String or [String0, String1] or error depending on options.twoValueMode
+        */
+        var inputs = null,
+            inputValid = true;
+        if (arg1 === undefined){
+            if ($.isArray(arg0))
+                inputs = arg0;
+            else
+                inputs = [ arg0 ];
+        }
+        else
+            inputs = [ arg0, arg1 ];
+
+        //Two arguments => must be same type
+        inputValid = (inputs.length == 1) || (typeof inputs[0] == typeof inputs[1]);
+
+        //Only Number or String
+        if (inputValid)
+            $.each( inputs, function( index, val ){
+                if ((typeof val != 'number') && (typeof val != 'string'))
+                    inputValid = false;
+            });
+
+        //[String, String] only when options.twoValueMode == true
+        //[String] only when options.twoValueMode == false + [String] => String
+        if (inputValid && (typeof inputs[0] == 'string'))
+            inputValid = (inputs.length == (latLngFormat.options.twoValueMode ? 2 : 1));
+
+        //[Number0] => [Number0, Number0], [String] => Stirng
+        if (inputValid && (inputs.length == 1)){
+            if (typeof inputs[0] == 'number')
+                inputs.push( inputs[0] );
+            else
+                inputs = inputs[0];
+        }
+
+        this._inputs = inputValid ? inputs : [null, null];
+        this.inputIsValid = inputValid;
+
+       if (!this.inputIsValid && window.console && window.console.warn)
+            window.console.warn('latLngFormat: Invalid arguments:', arg0, arg1);
+    }
+
+    /************************************
+    LatlngFormat Prototype
+    ************************************/
+    latLngFormat.fn = LatLngFormat.prototype = {
+        //_valueMethod = function(method, options): calls method(latLng, options, latLngFormat) with the latlng-value as input. Method returns a string or []string
+        _valueMethod: function(method, opt) {
+            var latLngFormat = window.latLngFormat,
+                options = $.extend({}, latLngFormat.options, opt || {}),
+                result;
+
+            if (options.twoValueMode){
+                result = [];
+                options.latOrLng = 0;
+                result.push( method.call( this, this._inputs[0], options, latLngFormat ) );
+                options.latOrLng = 1;
+                result.push( method.call( this, this._inputs[1], options, latLngFormat ) );
+            }
+            else
+                result = method.call( this, this._inputs, options, latLngFormat );
+
+            if (options.joinAsString && $.isArray(result))
+                result = options.preText + result.join(options.separator) + options.postText;
+
+            return result;
+        },
+
+        /**********************************************************
+        _valid - Return true if the value is a valid position
+        **********************************************************/
+        _valid: function(value, options){
+            options.latOrLng = options.latOrLng || 0;
+            if (typeof value == 'number')
+                return (value >= options.min[options.latOrLng]) && (value <= options.max[options.latOrLng]);
+            else
+                //The regexp is prefixed with ^(?: and suffixed with )$ to make it full-match-only.
+                return (new RegExp( '^(?:' + options.regexp[options.latOrLng] + ')$' )).test(value);
+        },
+
+        //valid - Return true if the input is a valid position
+        valid: function(asArray){
+            var result = this._valueMethod( this._valid, {twoValueMode: true} );
+            return asArray ? result : result[0] && result[1];
+        },
+
+        /**********************************************************
+        _format - Converts value to a string
+        **********************************************************/
+        _format: function(value, options, latLngFormat){
+            if (this.valid()){
+                if (typeof value == 'string')
+                    return value;
+                return latLngFormat._callMethodFromFormatList( 'format', this, arguments );
+            }
+            else
+                return false;
+        },
+
+        //format - Converts number value to a string, using this.displayMask or this.editMask
+        format: function( options ){
+            if (this.inputIsValid && this.valid()){
+                options = options || {};
+                options.joinAsString = !options.asArray;
+                return this._valueMethod( this._format, options );
+            }
+            else
+                return false;
+        },
+
+        //formatTrunc - Converts number value to a string, truncating any zero-values
+        formatTrunc: function( options ){
+            options = options || {};
+            options.truncate = true;
+            return this.format( options );
+        },
+
+        /**********************************************************
+        _ value - Converts value (string masked as editMask) to decimal degrees.
+        **********************************************************/
+        _value: function(value, options, latLngFormat){
+            if (typeof value != 'string')
+                return false;
+
+            return latLngFormat._callMethodFromFormatList( 'value', this, arguments );
+        },
+
+        //value - Converts value (string masked as editMask) to decimal degrees.
+        value: function(){
+            var result = this._valueMethod( this._value );
+
+            //Check if both lat and lng are not false
+            if ( $.isArray(result) && ((result[0] === false) || (result[1] === false)) )
+                result = false;
+
+            //Round or truncate
+            if (result) {
+                result[0] = window.precision(result[0], 4);
+                result[1] = window.precision(result[1], 4);
+            }
+
+            return result;
+        },
+
+
+        //convertTo - If value is valid => convert it to newFormatId format and return it as text-string, else return false
+        convertTo: function( newFormatId, options ){
+            var formatId = latLngFormat.options.formatId,
+                result   = this.value();
+
+            if (result){
+                latLngFormat.setFormat( newFormatId );
+                var newLatLngFormat = latLngFormat( result );
+                result = newLatLngFormat.valid() ? newLatLngFormat.format( options ) : false;
+                latLngFormat.setFormat( formatId );
+            }
+
+            return result;
+        }
+    };//end of latLngFormat.fn = LatLngFormat.prototype = {
+
+
+}(jQuery, this, document));
+;
+/****************************************************************************
+latlng-format-degrees
+
+Set methodes and options for format degrees, minutes, seconds
+
+
+****************************************************************************/
+
+(function ($, window/*, document, undefined*/) {
+    "use strict";
+    var LATLNGFORMAT_DMSS = window.latLngFormat.LATLNGFORMAT_DMSS, //Degrees Minutes Seconds Decimal Seconds: N65d30'15.3"  d='degree sign'
+        LATLNGFORMAT_DMM  = window.latLngFormat.LATLNGFORMAT_DMM,  //Degrees Decimal minutes                : N65d30.258'
+        LATLNGFORMAT_DD   = window.latLngFormat.LATLNGFORMAT_DD;   //Decimal degrees                        : N41.1234d
+
+    window.latLngFormat.formatList[LATLNGFORMAT_DMSS] =
+    window.latLngFormat.formatList[LATLNGFORMAT_DMM] =
+    window.latLngFormat.formatList[LATLNGFORMAT_DD] = {
+
+        /************************************
+        getOptions
+        ************************************/
+        getOptions: function(formatId){
             /*
-            Create editMask,convertMask, regexp, placeholder in options based on options.formatId and numeral.js
+            Create options with editMask, convertMask, regexp, placeholder
             Regular expressions for different type of position input
             The regexp are 'build' using regexp for the sub-parts:
                 H=Hemisphere        : [n,N,s,S]
@@ -11703,94 +12044,1253 @@ latlng-format, a class to validate, format, and transform positions (eq. leaflet
             _regexp.MMmmm     = '(' + _regexp.MM + '(' + _regexp.seperator + '\\d{1,3}' + ')?' + ')?';                           //MMmmm=Minutes and Decimal minutes = [MM[0-999]]
             _regexp.MMSSs     = '(' + _regexp.MM + '(' + _regexp.SS + '(' + _regexp.seperator + '\\d{1,1}' + ')?' + ')?' + ')?'; //MMSSss= Minutes Second and Decimal Seconds = [MM[ SS[0-99]]]
 
-            var dS = '.', //Default
-                dC = this.options.degreeChar,
-                newOptions = {};
+            var dS     = window.latLngFormat.options.delimitersDecimal,
+                dC     = window.latLngFormat.options.degreeChar,
+                result = {
+                    twoValueMode: true,
+                         //lat, lng
+                    min: [-90, -180],
+                    max: [ 90,  180]
+                };
 
-            //Try to get delimiters from current locale in numeral
-            var n = window.numeral,
-                n_localeData = n && n.localeData ? n.localeData() : null,
-                n_delimiters_decimal = n_localeData && n_localeData.delimiters && n_localeData.delimiters.decimal ? n_localeData.delimiters.decimal : null;
-
-            if (n_delimiters_decimal)
-              dS = n_delimiters_decimal;
-            else {
-                var S = Number(1.1).toLocaleString();
-                dS = S.indexOf('.') > -1 ? '.' :
-                     S.indexOf(',') > -1 ? ',' :
-                     '.';
-            }
-
-            this.options.delimitersDecimal = dS;
-
-            switch (this.options.formatId){
+            switch (formatId){
                 case LATLNGFORMAT_DMSS:
-                    newOptions = { //Degrees Minutes Seconds (N41d25'01")
+                    $.extend(result, { //Degrees Minutes Seconds (N41d25'01")
                         displayMask: "DDD"+dC+"MM'SS"+dS+"s\"H",
                         editMask   : "DDD MM SS"+dS+"sH",
                         convertMask: ['DDD', 'MM', 'SS', 's'],
                         regexp     : [ _regexp.anySpace + '(90|'  + _regexp.DD  + _regexp.anySpace + _regexp.MMSSs + ')' + _regexp.anySpace + _regexp.hemisphereLat  + _regexp.anySpace,
                                        _regexp.anySpace + '(180|' + _regexp.DDD + _regexp.anySpace + _regexp.MMSSs + ')' + _regexp.anySpace + _regexp.hemisphereLong + _regexp.anySpace  ],
                         placeholder: ["89 59 59"+dS+"9N", "179 59 59"+dS+"9E"],
-                    };
+                    });
                     break;
 
                 case LATLNGFORMAT_DMM:
-                    newOptions = { //Degrees Decimal minutes (N41d25.123')
+                    $.extend(result, { //Degrees Decimal minutes (N41d25.123')
                         displayMask: "DDD"+dC+"MM"+dS+"mmm'H",
                         editMask   : "DDD MM"+dS+"mmmH",
                         convertMask: ['DDD', 'MM', 'mmm'],
                         regexp     : [ _regexp.anySpace + '(90|'  + _regexp.DD  + _regexp.anySpace + _regexp.MMmmm + ')' + _regexp.anySpace + _regexp.hemisphereLat  + _regexp.anySpace,
                                        _regexp.anySpace + '(180|' + _regexp.DDD + _regexp.anySpace + _regexp.MMmmm + ')' + _regexp.anySpace + _regexp.hemisphereLong + _regexp.anySpace  ],
                         placeholder: ["89 59"+dS+"999N", "179 59"+dS+"999E"],
-                    };
+                    });
                     break;
 
                 case LATLNGFORMAT_DD:
-                    newOptions = { //Decimal degrees (N41.1234d)
+                    $.extend(result, { //Decimal degrees (N41.1234d)
                         displayMask: "DDD"+dS+"dddd"+dC+"H",
                         editMask   : "DDD"+dS+"ddddH",
                         convertMask: ['DDD', 'dddd'],
                         regexp     : [ _regexp.anySpace + '(90|'  + _regexp.DD  + _regexp.anySpace + _regexp.dddd + ')' + _regexp.anySpace + _regexp.hemisphereLat  + _regexp.anySpace,
                                        _regexp.anySpace + '(180|' + _regexp.DDD + _regexp.anySpace + _regexp.dddd + ')' + _regexp.anySpace + _regexp.hemisphereLong + _regexp.anySpace  ],
                         placeholder: ["89.9999N", "179.9999E"],
-                    };
+                    });
                     break;
             }
-            $.extend( this.options, newOptions );
+            return result;
+        },
 
-            return formatId;
+        /************************************
+        format
+        ************************************/
+        format: function(value, options, latLngFormat){
+
+            function trim(value, lgd){
+                var result = ''+value;
+                if (options.truncate){
+                    if (value == 0)
+                        result = '';
+                }
+                else
+                    while (result.length < lgd)
+                        result = '0'+result;
+                return result;
+            }
+            function append(value, lgd){
+                var result = ''+value;
+                if (options.truncate)
+                    result = result.replace( /0*$/g, '');
+                else
+                    while (result.length < lgd)
+                        result = result+'0';
+                return result;
+            }
+
+            var parts = latLngFormat.split(value),
+                result = (options.useEditMask ? options.editMask : options.displayMask)
+                            .replace('H', options.latOrLng ?
+                                            (parts.hemisphere == 1 ? 'E' : 'W') :
+                                            (parts.hemisphere == 1 ? 'N' : 'S')
+                            );
+            result = result.replace(/DDD/ , parts.degrees                   );
+            result = result.replace(/dddd/, append(parts.degreesDecimal, 4) );
+            result = result.replace(/MM/  , trim(parts.minutes,          2) );
+            result = result.replace(/mmm/ , append(parts.minutesDecimal, 3) );
+            result = result.replace(/SS/  , trim(parts.seconds,          2) );
+            result = result.replace(/s/   , trim(parts.secondsDecimal,   1) );
+
+            if (options.truncate){
+                //Remove delimiters not followed by a digit
+                result = result.replace( new RegExp('\\'+options.delimitersDecimal + '(?![0-9])', 'g'), '');
+
+                /*
+                Remove sign for minute (') and seconds (") without pending digital
+                Using regExp result = result.replace( /(?<!\d)[\'\"]/g, ''); works but JavaScript do not support 'before': < so
+                a workaround is used
+                */
+                var i = 1;
+                while (i < result.length)
+                    if ( ((result.charAt(i) == '"') || (result.charAt(i) == "'")) &&
+                         !$.isNumeric(result.charAt(i-1))
+                       )
+                        result = result.slice(0,i) + result.slice(i+1);
+                    else
+                        i++;
+            }
+
+            return result;
+        },
+
+        /************************************
+        value
+        Using convertMask to convert the different part of the text. Any space is ignored
+        ************************************/
+        value: function(value, options/*, latLngFormat*/){
+            //toDecimal - Convert a integer value v to a decimal. Eq    toDecimal(89)    = 0.89, toDecimal(9) = 0.9, toDecimal(1234)    = 0.1234
+            function toDecimal(v) {
+                var l = v.toString().length;
+                return v / Math.pow(10, l);
+            }
+
+            value = value.toUpperCase().trim();
+
+            //Convert N or E to +1 and S or W to -1
+            var sign = 1;
+            if ( (value.indexOf('S') > -1) || (value.indexOf('W') > -1) )
+                sign = -1;
+
+            //Remove all no-digital charts
+            value = value.replace(/\D+/g, ' ');
+            if ((value === '') || !this._valid(value, options))
+                return false;
+
+            var split = value.split(/\D/),
+                result = 0,
+                convertMaskIndex = 0,
+                i, nextValue;
+            for (i=0; i<split.length; i++ ){
+                nextValue = parseInt(split[i]);
+                if (!isNaN(nextValue)){
+                    switch (options.convertMask[convertMaskIndex]){
+                        case 'DDD' : result = result + nextValue;                 break;
+                        case 'MM'  : result = result + nextValue/60;              break;
+                        case 'mmm' : result = result + toDecimal(nextValue)/60;   break;
+                        case 's'   : result = result + toDecimal(nextValue)/3600; break;
+                        case 'SS'  : result = result + nextValue/3600;            break;
+                        case 'dddd': result = result + toDecimal(nextValue);      break;
+                    }
+                    convertMaskIndex++;
+                    if (convertMaskIndex >= options.convertMask.length)
+                        break;
+                }
+            }
+            return sign*result;
         }
-    }); //end of $.extend( latLngFormat, {
 
-    // expose access to the constructor and set default format
-    window.latLngFormat = latLngFormat;
-    window.latLngFormat.setFormat( LATLNGFORMAT_DMSS );
+    }; //end of window.latLngFormat.formatList[...] =
 
-    //Overwrite numeral.js method XX to update format with new decimal delimiters
-    var n = window.numeral;
-    if (n && n.locale){
-        n.locale =
-            function( locale ){
-                return function(){
-                    //Original function
-                    var result = locale.apply(this, arguments);
+    //Set LATLNGFORMAT_DMSS as default
+    if (!window.latLngFormat.options.formatId)
+        window.latLngFormat.setFormat(LATLNGFORMAT_DMSS);
 
-                    //Update format
-                    window.latLngFormat.setFormat();
+}(jQuery, this, document));
+;
+/****************************************************************************
+latlng-format-nac
 
-                    return result;
-                };
-            }( n.locale );
+Set methodes and options for format nac
+
+Using the methods
+from  https://github.com/PowerPan/leaflet.mouseCoordinate
+by "Johannes Rudolph johannes.rudolph@gmx.com
+
+****************************************************************************/
+
+(function ($, window/*, document, undefined*/) {
+    "use strict";
+
+    /**
+    * Created by Johannes Rudolph <johannes.rudolph@gmx.com> on 01.09.2016.
+    */
+
+    /**
+    *
+    * @type {{fromLatLng: NAC.fromLatLng, _nac2Letter: NAC._nac2Letter}}
+    */
+    var NAC = {
+
+        /**
+        *
+        * @param {{lat: number, lng: number}}
+        * @returns {string}
+        */
+        fromLatLng: function(latlng) {
+            var lat = latlng.lat;
+            var lon = latlng.lng;
+            var x = [];
+            var y = [];
+            var xy = [];
+            xy.x = '';
+            xy.y = '';
+            if (lon >= -180 && lon <= 180) {
+                var xlon = (lon + 180) / 360;
+                x = this._calcValues(xlon);
+            } else {
+                x[0] = 0;
+            }
+            if (lat >= -90 && lat <= 90) {
+                var ylat = (lat + 90) / 180;
+                y = this._calcValues(ylat);
+            } else {
+                y[0] = 0;
+            }
+            for (var i = 0; i < x.length; i++) {
+                xy.x += this._nac2Letter(x[i]);
+            }
+            for (i = 0; i < y.length; i++) {
+                xy.y += this._nac2Letter(y[i]);
+            }
+            return xy;
+        },
+
+        /**
+        *
+        * @param z
+        * @returns {Array}
+        * @private
+        */
+        _calcValues: function (z){
+            var ret = [];
+            ret[0] = parseInt(z * 30,10);
+            ret[1] = parseInt((z * 30 - ret[0]) * 30,10);
+            ret[2] = parseInt(((z * 30 - ret[0]) * 30 - ret[1]) * 30,10);
+            ret[3] = parseInt((((z * 30 - ret[0]) * 30 - ret[1]) * 30 - ret[2]) * 30,10);
+            ret[4] = parseInt(((((z * 30 - ret[0]) * 30 - ret[1]) * 30 - ret[2]) * 30 - ret[3]) * 30,10);
+            ret[5] = parseInt((((((z * 30 - ret[0]) * 30 - ret[1]) * 30 - ret[2]) * 30 - ret[3]) * 30 - ret[4]) * 30,10);
+            return ret;
+        },
+
+        /**
+        *
+        * @param number
+        * @returns {string}
+        * @private
+        */
+        _nac2Letter: function(number){
+            var nac_letters = "0123456789BCDFGHJKLMNPQRSTVWXZ";
+            if(!isNaN(number) && number < 30)
+                return nac_letters.substr(number,1);
+            else return 0;
+        }
+    };
+
+
+    /************************************************************************************
+    ************************************************************************************/
+    window.latLngFormat.formatList[window.latLngFormat.LATLNGFORMAT_NAC] = {
+
+        /************************************
+        getOptions
+        ************************************/
+        getOptions: function( /*formatId*/ ){
+            var zeroOrMoreSpace = '\\s*',
+                oneOrMoreSpace  = '\\s+',
+                nacChars        = '[0123456789BCDFGHJKLMNPQRSTVWXZ]{2,6}';
+            return {
+                twoValueMode: false,
+                    //lat, lng
+                min: [-90, -180],
+                max: [ 90,  180],
+
+                displayMask : "",
+                editMask    : "",
+                regexp      : zeroOrMoreSpace + nacChars + oneOrMoreSpace + nacChars + zeroOrMoreSpace,
+                placeholder : "J0Z8B S8NRP",
+           };
+        },
+
+        /************************************
+        format
+        ************************************/
+        format: function(value/*, options, latLngFormat*/){
+            var result = NAC.fromLatLng({lat:value[0], lng:value[1]});
+            return [result.x, result.y];
+        },
+
+        /************************************
+        value
+        Convert "0VJZTG S5LFGZ" to lat-lng
+        ************************************/
+        value: function(value, options/*, latLngFormat*/){
+            if (!this._valid(value, options))
+                return false;
+
+            //Trim and remove multi space
+            value = value.toUpperCase().trim();
+            value = value.replace(/\s{2,}/g, ' ');
+
+            var nacLetters = "0123456789BCDFGHJKLMNPQRSTVWXZ",
+                valueList = value.split(' '),
+                result = {};
+
+            /*
+            First, convert all characters X1, X2, X3, X4, ... Y1, Y2, Y3, Y4, ... Z1, Z2, Z3, Z4, ... into integers x1, x2, x3, x4, ... y1, y2, y3, y4, ... z1, z2, z3, z4, ... according to the Table of the NAC Character and Integer Correspondences.
+            Then use the following formulae to calculate coordinates:
+
+            Longitude = (x1/30+x2/30^2+x3/30^3+x4/30^4+...)*360-180
+            Latitude =  (y1/30+y2/30^2+y3/30^3+y4/30^4+...)*180-90
+
+            */
+            $.each(valueList, function(index, str){
+                var charList = str.split(''),
+                    coor     = 0,
+                    factor   = 30;
+
+                $.each(charList, function(index, letter){
+                    coor = coor + nacLetters.indexOf(letter)/factor;
+                    factor = 30*factor;
+                });
+
+                if (index)
+                    result.lat = coor*180 - 90;
+                else
+                    result.lng = coor*360 - 180;
+
+            });
+
+            return [result.lat, result.lng];
+        }
+
+    }; //end of window.latLngFormat.formatList[...] =
+
+}(jQuery, this, document));
+;
+/****************************************************************************
+latlng-format-proj4js-mgrs
+
+Set methodes and options for format mgrs
+using a ES5-version of https://github.com/proj4js/mgrs
+
+****************************************************************************/
+
+
+(function ($, window/*, document, undefined*/) {
+    "use strict";
+
+    /**
+     * UTM zones are grouped, and assigned to one of a group of 6
+     * sets.
+     *
+     * {int} @private
+     */
+    var NUM_100K_SETS = 6;
+
+    /**
+     * The column letters (for easting) of the lower left value, per
+     * set.
+ *
+     * {string} @private
+ */
+    var SET_ORIGIN_COLUMN_LETTERS = 'AJSAJS';
+
+    /**
+    * The row letters (for northing) of the lower left value, per
+    * set.
+    *
+    * {string} @private
+    */
+    var SET_ORIGIN_ROW_LETTERS = 'AFAFAF';
+
+    var A = 65; // A
+    var I = 73; // I
+    var O = 79; // O
+    var V = 86; // V
+    var Z = 90; // Z
+
+    /**
+     * Conversion from degrees to radians.
+     *
+     * @private
+     * @param {number} deg the angle in degrees.
+     * @return {number} the angle in radians.
+     */
+    function degToRad(deg) {
+        return (deg * (Math.PI / 180.0));
+    }
+
+    /**
+     * Conversion from radians to degrees.
+     *
+     * @private
+     * @param {number} rad the angle in radians.
+     * @return {number} the angle in degrees.
+     */
+    function radToDeg(rad) {
+        return (180.0 * (rad / Math.PI));
+    }
+
+    /**
+    * Calculates the MGRS letter designator for the given latitude.
+    *
+    * @private
+    * @param {number} lat The latitude in WGS84 to get the letter designator
+    *     for.
+    * @return {char} The letter designator.
+    */
+    function getLetterDesignator(lat) {
+        //This is here as an error flag to show that the Latitude is
+        //outside MGRS limits
+        var LetterDesignator = 'Z';
+
+        if ((84 >= lat) && (lat >= 72)) {
+            LetterDesignator = 'X';
+        }
+        else if ((72 > lat) && (lat >= 64)) {
+            LetterDesignator = 'W';
+        }
+        else if ((64 > lat) && (lat >= 56)) {
+            LetterDesignator = 'V';
+        }
+        else if ((56 > lat) && (lat >= 48)) {
+            LetterDesignator = 'U';
+        }
+        else if ((48 > lat) && (lat >= 40)) {
+            LetterDesignator = 'T';
+        }
+        else if ((40 > lat) && (lat >= 32)) {
+            LetterDesignator = 'S';
+        }
+        else if ((32 > lat) && (lat >= 24)) {
+            LetterDesignator = 'R';
+        }
+        else if ((24 > lat) && (lat >= 16)) {
+            LetterDesignator = 'Q';
+        }
+        else if ((16 > lat) && (lat >= 8)) {
+            LetterDesignator = 'P';
+        }
+        else if ((8 > lat) && (lat >= 0)) {
+            LetterDesignator = 'N';
+        }
+        else if ((0 > lat) && (lat >= -8)) {
+            LetterDesignator = 'M';
+        }
+        else if ((-8 > lat) && (lat >= -16)) {
+            LetterDesignator = 'L';
+        }
+        else if ((-16 > lat) && (lat >= -24)) {
+            LetterDesignator = 'K';
+        }
+        else if ((-24 > lat) && (lat >= -32)) {
+            LetterDesignator = 'J';
+        }
+        else if ((-32 > lat) && (lat >= -40)) {
+            LetterDesignator = 'H';
+        }
+        else if ((-40 > lat) && (lat >= -48)) {
+            LetterDesignator = 'G';
+        }
+        else if ((-48 > lat) && (lat >= -56)) {
+            LetterDesignator = 'F';
+        }
+        else if ((-56 > lat) && (lat >= -64)) {
+            LetterDesignator = 'E';
+        }
+        else if ((-64 > lat) && (lat >= -72)) {
+            LetterDesignator = 'D';
+        }
+        else if ((-72 > lat) && (lat >= -80)) {
+            LetterDesignator = 'C';
+        }
+        return LetterDesignator;
+    }
+
+    /**
+    * Encodes a UTM location as MGRS string.
+    *
+    * @private
+    * @param {object} utm An object literal with easting, northing,
+    *     zoneLetter, zoneNumber
+    * @param {number} accuracy Accuracy in digits (1-5).
+    * @return {string} MGRS string for the given UTM location.
+    */
+    function encode(utm, accuracy) {
+        // prepend with leading zeroes
+        var seasting = "00000" + utm.easting,
+            snorthing = "00000" + utm.northing;
+        return utm.zoneNumber + utm.zoneLetter + get100kID(utm.easting, utm.northing, utm.zoneNumber) + seasting.substr(seasting.length - 5, accuracy) + snorthing.substr(snorthing.length - 5, accuracy);
+    }
+
+    /**
+    * Get the two letter 100k designator for a given UTM easting,
+    *  northing and zone number value.
+    *
+    * @private
+    * @param {number} easting
+    * @param {number} northing
+    * @param {number} zoneNumber
+    * @return the two letter 100k designator for the given UTM location.
+    */
+    function get100kID(easting, northing, zoneNumber) {
+        var setParm = get100kSetForZone(zoneNumber);
+        var setColumn = Math.floor(easting / 100000);
+        var setRow = Math.floor(northing / 100000) % 20;
+        return getLetter100kID(setColumn, setRow, setParm);
+    }
+
+    /**
+    * Given a UTM zone number, figure out the MGRS 100K set it is in.
+    *
+    * @private
+    * @param {number} i An UTM zone number.
+    * @return {number} the 100k set the UTM zone is in.
+    */
+    function get100kSetForZone(i) {
+        var setParm = i % NUM_100K_SETS;
+        if (setParm === 0) {
+            setParm = NUM_100K_SETS;
+        }
+        return setParm;
+    }
+
+    /**
+    * Get the two-letter MGRS 100k designator given information
+    * translated from the UTM northing, easting and zone number.
+    *
+    * @private
+    * @param {number} column the column index as it relates to the MGRS
+    *        100k set spreadsheet, created from the UTM easting.
+    *        Values are 1-8.
+    * @param {number} row the row index as it relates to the MGRS 100k set
+    *        spreadsheet, created from the UTM northing value. Values
+    *        are from 0-19.
+    * @param {number} parm the set block, as it relates to the MGRS 100k set
+    *        spreadsheet, created from the UTM zone. Values are from
+    *        1-60.
+    * @return two letter MGRS 100k code.
+    */
+    function getLetter100kID(column, row, parm) {
+        // colOrigin and rowOrigin are the letters at the origin of the set
+        var index = parm - 1;
+        var colOrigin = SET_ORIGIN_COLUMN_LETTERS.charCodeAt(index);
+        var rowOrigin = SET_ORIGIN_ROW_LETTERS.charCodeAt(index);
+
+        // colInt and rowInt are the letters to build to return
+        var colInt = colOrigin + column - 1;
+        var rowInt = rowOrigin + row;
+        var rollover = false;
+
+        if (colInt > Z) {
+            colInt = colInt - Z + A - 1;
+            rollover = true;
+        }
+
+        if (colInt === I || (colOrigin < I && colInt > I) || ((colInt > I || colOrigin < I) && rollover)) {
+            colInt++;
+        }
+
+        if (colInt === O || (colOrigin < O && colInt > O) || ((colInt > O || colOrigin < O) && rollover)) {
+            colInt++;
+
+            if (colInt === I) {
+                colInt++;
+            }
+        }
+
+        if (colInt > Z) {
+            colInt = colInt - Z + A - 1;
+        }
+
+        if (rowInt > V) {
+            rowInt = rowInt - V + A - 1;
+            rollover = true;
+        }
+        else {
+            rollover = false;
+        }
+
+        if (((rowInt === I) || ((rowOrigin < I) && (rowInt > I))) || (((rowInt > I) || (rowOrigin < I)) && rollover)) {
+            rowInt++;
+        }
+
+        if (((rowInt === O) || ((rowOrigin < O) && (rowInt > O))) || (((rowInt > O) || (rowOrigin < O)) && rollover)) {
+            rowInt++;
+
+            if (rowInt === I) {
+                rowInt++;
+            }
+        }
+
+        if (rowInt > V) {
+            rowInt = rowInt - V + A - 1;
+        }
+
+        var twoLetter = String.fromCharCode(colInt) + String.fromCharCode(rowInt);
+        return twoLetter;
+    }
+
+    /**
+    * Decode the UTM parameters from a MGRS string.
+    *
+    * @private
+    * @param {string} mgrsString an UPPERCASE coordinate string is expected.
+    * @return {object} An object literal with easting, northing, zoneLetter,
+    *     zoneNumber and accuracy (in meters) properties.
+    */
+    function decode(mgrsString) {
+
+        if (mgrsString && mgrsString.length === 0) {
+            throw ("MGRSPoint coverting from nothing");
+        }
+
+        var length = mgrsString.length;
+
+          var hunK = null;
+        var sb = "";
+        var testChar;
+        var i = 0;
+
+          // get Zone number
+        while (!(/[A-Z]/).test(testChar = mgrsString.charAt(i))) {
+            if (i >= 2) {
+            throw ("MGRSPoint bad conversion from: " + mgrsString);
+            }
+            sb += testChar;
+            i++;
+        }
+
+          var zoneNumber = parseInt(sb, 10);
+
+          if (i === 0 || i + 3 > length) {
+            // A good MGRS string has to be 4-5 digits long,
+            // ##AAA/#AAA at least.
+            throw ("MGRSPoint bad conversion from: " + mgrsString);
+        }
+
+        var zoneLetter = mgrsString.charAt(i++);
+
+        // Should we check the zone letter here? Why not.
+        if (zoneLetter <= 'A' || zoneLetter === 'B' || zoneLetter === 'Y' || zoneLetter >= 'Z' || zoneLetter === 'I' || zoneLetter === 'O') {
+            throw ("MGRSPoint zone letter " + zoneLetter + " not handled: " + mgrsString);
+        }
+
+        hunK = mgrsString.substring(i, i += 2);
+
+        var set = get100kSetForZone(zoneNumber);
+
+        var east100k = getEastingFromChar(hunK.charAt(0), set);
+        var north100k = getNorthingFromChar(hunK.charAt(1), set);
+
+        // We have a bug where the northing may be 2000000 too low.
+        // How
+        // do we know when to roll over?
+
+        while (north100k < getMinNorthing(zoneLetter)) {
+            north100k += 2000000;
+        }
+
+        // calculate the char index for easting/northing separator
+        var remainder = length - i;
+
+        if (remainder % 2 !== 0) {
+            throw ("MGRSPoint has to have an even number \nof digits after the zone letter and two 100km letters - front \nhalf for easting meters, second half for \nnorthing meters" + mgrsString);
+        }
+
+        var sep = remainder / 2;
+
+        var sepEasting = 0.0;
+        var sepNorthing = 0.0;
+        var accuracyBonus, sepEastingString, sepNorthingString, easting, northing;
+        if (sep > 0) {
+            accuracyBonus = 100000.0 / Math.pow(10, sep);
+            sepEastingString = mgrsString.substring(i, i + sep);
+            sepEasting = parseFloat(sepEastingString) * accuracyBonus;
+            sepNorthingString = mgrsString.substring(i + sep);
+            sepNorthing = parseFloat(sepNorthingString) * accuracyBonus;
+        }
+
+        easting = sepEasting + east100k;
+        northing = sepNorthing + north100k;
+
+        return {
+            easting: easting,
+            northing: northing,
+            zoneLetter: zoneLetter,
+            zoneNumber: zoneNumber,
+            accuracy: accuracyBonus
+        };
+    }
+
+    /**
+    * Given the first letter from a two-letter MGRS 100k zone, and given the
+    * MGRS table set for the zone number, figure out the easting value that
+   * should be added to the other, secondary easting value.
+    *
+    * @private
+    * @param {char} e The first letter from a two-letter MGRS 100´k zone.
+    * @param {number} set The MGRS table set for the zone number.
+    * @return {number} The easting value for the given letter and set.
+    */
+    function getEastingFromChar(e, set) {
+        // colOrigin is the letter at the origin of the set for the
+        // column
+        var curCol = SET_ORIGIN_COLUMN_LETTERS.charCodeAt(set - 1);
+        var eastingValue = 100000.0;
+        var rewindMarker = false;
+
+        while (curCol !== e.charCodeAt(0)) {
+            curCol++;
+            if (curCol === I) {
+                curCol++;
+            }
+            if (curCol === O) {
+                curCol++;
+            }
+            if (curCol > Z) {
+                if (rewindMarker) {
+                    throw ("Bad character: " + e);
+                }
+                curCol = A;
+                rewindMarker = true;
+            }
+            eastingValue += 100000.0;
+        }
+
+        return eastingValue;
+    }
+
+    /**
+    * Given the second letter from a two-letter MGRS 100k zone, and given the
+    * MGRS table set for the zone number, figure out the northing value that
+    * should be added to the other, secondary northing value. You have to
+    * remember that Northings are determined from the equator, and the vertical
+    * cycle of letters mean a 2000000 additional northing meters. This happens
+    * approx. every 18 degrees of latitude. This method does *NOT* count any
+    * additional northings. You have to figure out how many 2000000 meters need
+    * to be added for the zone letter of the MGRS coordinate.
+    *
+    * @private
+    * @param {char} n Second letter of the MGRS 100k zone
+    * @param {number} set The MGRS table set number, which is dependent on the
+    *     UTM zone number.
+    * @return {number} The northing value for the given letter and set.
+    */
+    function getNorthingFromChar(n, set) {
+        if (n > 'V') {
+            throw ("MGRSPoint given invalid Northing " + n);
+        }
+
+        // rowOrigin is the letter at the origin of the set for the
+        // column
+        var curRow = SET_ORIGIN_ROW_LETTERS.charCodeAt(set - 1);
+        var northingValue = 0.0;
+        var rewindMarker = false;
+
+        while (curRow !== n.charCodeAt(0)) {
+            curRow++;
+            if (curRow === I) {
+                curRow++;
+            }
+            if (curRow === O) {
+                curRow++;
+            }
+            // fixing a bug making whole application hang in this loop
+            // when 'n' is a wrong character
+            if (curRow > V) {
+                if (rewindMarker) { // making sure that this loop ends
+                    throw ("Bad character: " + n);
+                }
+                curRow = A;
+                rewindMarker = true;
+            }
+            northingValue += 100000.0;
+        }
+
+        return northingValue;
+    }
+
+    /**
+    * The function getMinNorthing returns the minimum northing value of a MGRS
+    * zone.
+    *
+    * Ported from Geotrans' c Lattitude_Band_Value structure table.
+    *
+    * @private
+    * @param {char} zoneLetter The MGRS zone to get the min northing for.
+    * @return {number}
+    */
+    function getMinNorthing(zoneLetter) {
+        var northing;
+        switch (zoneLetter) {
+            case 'C': northing = 1100000.0; break;
+            case 'D': northing = 2000000.0; break;
+            case 'E': northing = 2800000.0; break;
+            case 'F': northing = 3700000.0; break;
+            case 'G': northing = 4600000.0; break;
+            case 'H': northing = 5500000.0; break;
+            case 'J': northing = 6400000.0; break;
+            case 'K': northing = 7300000.0; break;
+            case 'L': northing = 8200000.0; break;
+            case 'M': northing = 9100000.0; break;
+            case 'N': northing = 0.0; break;
+            case 'P': northing = 800000.0; break;
+            case 'Q': northing = 1700000.0; break;
+            case 'R': northing = 2600000.0; break;
+            case 'S': northing = 3500000.0; break;
+            case 'T': northing = 4400000.0; break;
+            case 'U': northing = 5300000.0; break;
+            case 'V': northing = 6200000.0; break;
+            case 'W': northing = 7000000.0; break;
+            case 'X': northing = 7900000.0; break;
+            default: northing = -1.0;
+        }
+        if (northing >= 0.0) {
+            return northing;
+        }
+        else {
+            throw ("Invalid zone letter: " + zoneLetter);
+        }
+    }
+
+    /**
+    * Converts a set of Longitude and Latitude co-ordinates to UTM
+    * using the WGS84 ellipsoid.
+    *
+    * @private
+    * @param {object} ll Object literal with lat and lon properties
+    *     representing the WGS84 coordinate to be converted.
+    * @param {boolean} truncate When true the result is truncated.
+    * @return {object} Object literal containing the UTM value with easting,
+    *     northing, zoneNumber and zoneLetter properties, and an optional
+    *     accuracy property in digits. Returns null if the conversion failed.
+    */
+    function LLtoUTM(ll, truncate) {
+        var Lat = ll.lat;
+        var Long = ll.lon;
+        var a = 6378137.0; //ellip.radius;
+        var eccSquared = 0.00669438; //ellip.eccsq;
+        var k0 = 0.9996;
+        var LongOrigin;
+        var eccPrimeSquared;
+        var N, T, C, A, M;
+        var LatRad = degToRad(Lat);
+        var LongRad = degToRad(Long);
+        var LongOriginRad;
+        var ZoneNumber;
+        // (int)
+        ZoneNumber = Math.floor((Long + 180) / 6) + 1;
+
+        //Make sure the longitude 180.00 is in Zone 60
+        if (Long === 180) {
+            ZoneNumber = 60;
+        }
+
+        // Special zone for Norway
+        if (Lat >= 56.0 && Lat < 64.0 && Long >= 3.0 && Long < 12.0) {
+            ZoneNumber = 32;
+        }
+
+        // Special zones for Svalbard
+        if (Lat >= 72.0 && Lat < 84.0) {
+            if (Long >= 0.0 && Long < 9.0) {
+                ZoneNumber = 31;
+            }
+            else if (Long >= 9.0 && Long < 21.0) {
+                ZoneNumber = 33;
+            }
+            else if (Long >= 21.0 && Long < 33.0) {
+                ZoneNumber = 35;
+            }
+            else if (Long >= 33.0 && Long < 42.0) {
+                ZoneNumber = 37;
+            }
+        }
+
+        LongOrigin = (ZoneNumber - 1) * 6 - 180 + 3; //+3 puts origin
+        // in middle of
+        // zone
+        LongOriginRad = degToRad(LongOrigin);
+
+        eccPrimeSquared = (eccSquared) / (1 - eccSquared);
+
+        N = a / Math.sqrt(1 - eccSquared * Math.sin(LatRad) * Math.sin(LatRad));
+        T = Math.tan(LatRad) * Math.tan(LatRad);
+        C = eccPrimeSquared * Math.cos(LatRad) * Math.cos(LatRad);
+        A = Math.cos(LatRad) * (LongRad - LongOriginRad);
+
+        M = a * ((1 - eccSquared / 4 - 3 * eccSquared * eccSquared / 64 - 5 * eccSquared * eccSquared * eccSquared / 256) * LatRad - (3 * eccSquared / 8 + 3 * eccSquared * eccSquared / 32 + 45 * eccSquared * eccSquared * eccSquared / 1024) * Math.sin(2 * LatRad) + (15 * eccSquared * eccSquared / 256 + 45 * eccSquared * eccSquared * eccSquared / 1024) * Math.sin(4 * LatRad) - (35 * eccSquared * eccSquared * eccSquared / 3072) * Math.sin(6 * LatRad));
+
+        var UTMEasting = (k0 * N * (A + (1 - T + C) * A * A * A / 6.0 + (5 - 18 * T + T * T + 72 * C - 58 * eccPrimeSquared) * A * A * A * A * A / 120.0) + 500000.0);
+
+        var UTMNorthing = (k0 * (M + N * Math.tan(LatRad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24.0 + (61 - 58 * T + T * T + 600 * C - 330 * eccPrimeSquared) * A * A * A * A * A * A / 720.0)));
+        if (Lat < 0.0) {
+            UTMNorthing += 10000000.0; //10000000 meter offset for
+            // southern hemisphere
+        }
+
+        return {
+            northing: truncate ? Math.floor(UTMNorthing) : Math.round(UTMNorthing),
+            easting : truncate ? Math.floor(UTMEasting)  : Math.round(UTMEasting),
+            zoneNumber: ZoneNumber,
+            zoneLetter: getLetterDesignator(Lat)
+        };
+    }
+
+    /**
+    * Converts UTM coords to lat/long, using the WGS84 ellipsoid. This is a convenience
+    * class where the Zone can be specified as a single string eg."60N" which
+    * is then broken down into the ZoneNumber and ZoneLetter.
+    *
+    * @private
+    * @param {object} utm An object literal with northing, easting, zoneNumber
+    *     and zoneLetter properties. If an optional accuracy property is
+    *     provided (in meters), a bounding box will be returned instead of
+    *     latitude and longitude.
+    * @return {object} An object literal containing either lat and lon values
+    *     (if no accuracy was provided), or top, right, bottom and left values
+    *     for the bounding box calculated according to the provided accuracy.
+    *     Returns null if the conversion failed.
+    */
+    function UTMtoLL(utm) {
+        var UTMNorthing = utm.northing;
+        var UTMEasting = utm.easting;
+        var zoneLetter = utm.zoneLetter;
+        var zoneNumber = utm.zoneNumber;
+        // check the ZoneNummber is valid
+        if (zoneNumber < 0 || zoneNumber > 60) {
+            return null;
+        }
+
+        var k0 = 0.9996;
+        var a = 6378137.0; //ellip.radius;
+        var eccSquared = 0.00669438; //ellip.eccsq;
+        var eccPrimeSquared;
+        var e1 = (1 - Math.sqrt(1 - eccSquared)) / (1 + Math.sqrt(1 - eccSquared));
+        var N1, T1, C1, R1, D, M;
+        var LongOrigin;
+        var mu, phi1Rad;
+
+        // remove 500,000 meter offset for longitude
+        var x = UTMEasting - 500000.0;
+        var y = UTMNorthing;
+
+        // We must know somehow if we are in the Northern or Southern
+        // hemisphere, this is the only time we use the letter So even
+        // if the Zone letter isn't exactly correct it should indicate
+        // the hemisphere correctly
+        if (zoneLetter < 'N') {
+            y -= 10000000.0; // remove 10,000,000 meter offset used
+            // for southern hemisphere
+        }
+
+        // There are 60 zones with zone 1 being at West -180 to -174
+        LongOrigin = (zoneNumber - 1) * 6 - 180 + 3; // +3 puts origin
+        // in middle of
+        // zone
+
+        eccPrimeSquared = (eccSquared) / (1 - eccSquared);
+
+        M = y / k0;
+        mu = M / (a * (1 - eccSquared / 4 - 3 * eccSquared * eccSquared / 64 - 5 * eccSquared * eccSquared * eccSquared / 256));
+
+        phi1Rad = mu + (3 * e1 / 2 - 27 * e1 * e1 * e1 / 32) * Math.sin(2 * mu) + (21 * e1 * e1 / 16 - 55 * e1 * e1 * e1 * e1 / 32) * Math.sin(4 * mu) + (151 * e1 * e1 * e1 / 96) * Math.sin(6 * mu);
+        // double phi1 = ProjMath.radToDeg(phi1Rad);
+
+        N1 = a / Math.sqrt(1 - eccSquared * Math.sin(phi1Rad) * Math.sin(phi1Rad));
+        T1 = Math.tan(phi1Rad) * Math.tan(phi1Rad);
+        C1 = eccPrimeSquared * Math.cos(phi1Rad) * Math.cos(phi1Rad);
+        R1 = a * (1 - eccSquared) / Math.pow(1 - eccSquared * Math.sin(phi1Rad) * Math.sin(phi1Rad), 1.5);
+        D = x / (N1 * k0);
+
+        var lat = phi1Rad - (N1 * Math.tan(phi1Rad) / R1) * (D * D / 2 - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * eccPrimeSquared) * D * D * D * D / 24 + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * eccPrimeSquared - 3 * C1 * C1) * D * D * D * D * D * D / 720);
+        lat = radToDeg(lat);
+
+        var lon = (D - (1 + 2 * T1 + C1) * D * D * D / 6 + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * eccPrimeSquared + 24 * T1 * T1) * D * D * D * D * D / 120) / Math.cos(phi1Rad);
+        lon = LongOrigin + radToDeg(lon);
+
+        var result;
+        if (utm.accuracy) {
+            var topRight = MGRS.UTMtoLL({
+                    northing: utm.northing + utm.accuracy,
+                    easting: utm.easting + utm.accuracy,
+                    zoneLetter: utm.zoneLetter,
+                    zoneNumber: utm.zoneNumber
+                });
+            result = {
+                top: topRight.lat,
+                right: topRight.lon,
+                bottom: lat,
+                left: lon
+            };
+        }
+        else {
+            result = {
+                lat: lat,
+                lon: lon
+            };
+        }
+        return result;
     }
 
 
+    /************************************************************************************
+    MGRS
+    ************************************************************************************/
+    var MGRS = {
+        /**
+             * Conversion of lat/lon to MGRS.
+         *
+         * @param {object} ll Object literal with lat and lon properties on a
+         *     WGS84 ellipsoid.
+         * @param {int} accuracy Accuracy in digits (5 for 1 m, 4 for 10 m, 3 for
+         *      100 m, 2 for 1000 m or 1 for 10000 m). Optional, default is 5.
+         * @return {string} the MGRS string for the given location and accuracy.
+         */
+        forward: function(ll, accuracy) {
+            accuracy = accuracy || 5; // default accuracy 1m
+            return encode(MGRS.LLtoUTM({
+                lat: ll[0], //Changed by Niels Holt
+                lon: ll[1]  //Changed by Niels Holt
+            }, true), accuracy);
+        },
+
+        /**
+         * Conversion of MGRS to lat/lon.
+         *
+         * @param {string} mgrs MGRS string.
+         * @return {array} An array with left (longitude), bottom (latitude), right
+         *     (longitude) and top (latitude) values in WGS84, representing the
+         *     bounding box for the provided MGRS reference.
+         */
+        inverse: function(mgrs) {
+            var bbox = UTMtoLL(decode(mgrs.toUpperCase()));
+            if (bbox.lat && bbox.lon) {
+                return [bbox.lon, bbox.lat, bbox.lon, bbox.lat];
+            }
+            return [bbox.left, bbox.bottom, bbox.right, bbox.top];
+        },
+
+        toPoint: function(mgrs) {
+            var bbox = MGRS.UTMtoLL(decode(mgrs.toUpperCase()));
+            if (bbox.lat && bbox.lon) {
+                return [bbox.lon, bbox.lat];
+            }
+            //Changed from lng, lat to lat,lng by Niels Holt
+            //return [(bbox.left + bbox.right) / 2, (bbox.top + bbox.bottom) / 2];
+            return [(bbox.top + bbox.bottom) / 2 , (bbox.left + bbox.right) / 2];
+        },
+
+        LLtoUTM: LLtoUTM,
+        UTMtoLL: UTMtoLL
+    };
+
+
+
+    /************************************************************************************
+    ************************************************************************************/
+    window.latLngFormat.formatList[window.latLngFormat.LATLNGFORMAT_MGRS] = {
+
+        /************************************
+        MGRS - the object doing the calculation
+        ************************************/
+        MGRS: MGRS,
+
+        /************************************
+        getOptions
+        See https://www.usna.edu/Users/oceano/pguth/md_help/html/mgrs_utm.htm for format
+        ************************************/
+        getOptions: function( /*formatId*/ ){
+            var zeroOrMoreSpace = '\\s*',
+                c2xNoIorO       = '[CDEFGHJKLMNPQRSTUVWX]', //C-X without I and O
+                a2zNoIorO       = '[ABCDEFGHJKLMNPQRSTUVWXYZ]', //A-Z without I and O
+                regexp          =
+                    zeroOrMoreSpace +
+                    '(0?[1-9]|[1-5][0-9]|60)' + //[0]1-9 or 10-59 or 60
+                    zeroOrMoreSpace +
+                    c2xNoIorO +
+                    zeroOrMoreSpace +
+                    a2zNoIorO +
+                    zeroOrMoreSpace +
+                    a2zNoIorO +
+                    zeroOrMoreSpace;
+
+            //2, 4, 6, 8 or 10 digits with optional space in the middle
+            regexp = regexp + '(';
+            for (var digits=1; digits<=5; digits++){
+                if (digits>1)
+                    regexp += '|';
+                regexp += '\\d{' + digits + '}' + zeroOrMoreSpace + '\\d{' + digits + '}';
+            }
+            regexp = regexp + ')' + zeroOrMoreSpace;
+
+            return {
+                twoValueMode: false,
+                     //lat, lng
+                min: [-80, -180],
+                max: [ 84,  180],
+
+                displayMask : "",
+                editMask    : "",
+                regexp      : regexp,
+                placeholder : "48N CD 12345 12345",
+           };
+        },
+
+        /************************************
+        format
+        ************************************/
+        format: function(value/*, options, latLngFormat*/){
+
+            // prepend with leading zeroes
+            var utm = MGRS.LLtoUTM({lat: value[0], lon: value[1]}, true),
+                accuracy  = 5,
+                zoneNumber = ''+utm.zoneNumber,
+                seasting  = "00000" + utm.easting,
+                snorthing = "00000" + utm.northing,
+                result = [
+                    (zoneNumber.length < 2  ? '0'+zoneNumber : zoneNumber) + utm.zoneLetter,
+                    get100kID(utm.easting, utm.northing, utm.zoneNumber),
+                    seasting.substr(seasting.length - 5, accuracy),
+                    snorthing.substr(snorthing.length - 5, accuracy)
+                ];
+            return result;
+        },
+
+        /************************************
+        value
+        Convert "33I UB 36257 11489" to lat-lng
+        ************************************/
+        value: function(value, options/*, latLngFormat*/){
+            if (!this._valid(value, options))
+                return false;
+
+            //Remove ALL space => value = "33IUB3625711489"
+            value = value.toUpperCase().trim();
+            value = value.replace(/\s/g, '');
+
+            //If one digit zone without leading zero => add leading zero
+            if ( (new RegExp('^\\d?\\D')).test(value))
+                value = '0'+value;
+
+            return MGRS.toPoint(value);
+        }
+
+    }; //end of window.latLngFormat.formatList[...] =
+}(jQuery, this, document));
+;
+/****************************************************************************
+latlng-format-utm
+
+Set methodes and options for format utm
+
+
+****************************************************************************/
+
+(function ($, window/*, document, undefined*/) {
+    "use strict";
+
+    window.latLngFormat.formatList[window.latLngFormat.LATLNGFORMAT_UTM] = {
+
+        /************************************
+        getOptions
+        ************************************/
+        getOptions: function( /*formatId*/ ){
+            var zeroOrMoreSpace = '\\s*',
+                oneOrMoreSpace  = '\\s+',
+                onToSevenDigits = '\\d{1,7}',
+                regexp          =
+                    zeroOrMoreSpace +
+                    '(0?[1-9]|[1-5][0-9]|60)' + //[0]1-9 or 10-59 or 60
+                    zeroOrMoreSpace +
+                    '[CDEFGHJKLMNPQRSTUVWX]' + //C-X without I and O
+                    oneOrMoreSpace +
+                    onToSevenDigits +
+                    oneOrMoreSpace +
+                    onToSevenDigits +
+                    zeroOrMoreSpace;
+
+                //(0?[1-9]|[1-5][0-9]|60)\s*[CDEFGHJKLMNPQRSTUVWXX]\s+\d{7}\s+\d{7}\s*
+
+            return {
+                twoValueMode: false,
+                     //lat, lng
+                min: [-80, -180],
+                max: [ 84,  180],
+
+                displayMask : "",
+                editMask    : "",
+                regexp      : regexp,
+                placeholder : "48N 0123456 1234567",
+           };
+        },
+
+        /************************************
+        format
+        ************************************/
+        format: function(value, options/*, latLngFormat*/){
+            function pad(value, lgd){
+                var result = ''+value;
+                if (!options.truncate)
+                    while (result.length < lgd)
+                        result = '0'+result;
+                return result;
+            }
+
+            var utm = window.latLngFormat.formatList[window.latLngFormat.LATLNGFORMAT_MGRS].MGRS.LLtoUTM({lat: value[0], lon: value[1]});
+            return [pad(utm.zoneNumber, 2) + utm.zoneLetter, pad(utm.easting, 7), pad(utm.northing, 7)];
+        },
+
+        /************************************
+        value
+        Convert "12N 123456 1234567" to lat-lng
+        ************************************/
+        value: function(value, options/*, latLngFormat*/){
+            if (!this._valid(value, options))
+                return false;
+
+            //Remove multi space => value = "12N 123456 1234567" or "12 N 123456 1234567"
+            value = value.toUpperCase().trim();
+            value = value.replace(/\s{2,}/g, ' ');
+
+            //If one digit zone without leading zero => add leading zero
+            if ( (new RegExp('^\\d\\s?\\D')).test(value))
+                value = '0'+value;
+
+            var valueList = value.split(' ');
+            //Special case: "12 N 123456 1234567" => [0..3] converted to [0..2]
+            if (valueList.length == 4){
+                valueList[0] = valueList[0] + valueList[1];
+                valueList[1] = valueList[2];
+                valueList[2] = valueList[3];
+                valueList.pop();
+            }
+
+            var latlng = window.latLngFormat.formatList[window.latLngFormat.LATLNGFORMAT_MGRS].MGRS.UTMtoLL({
+                    northing  : parseInt(valueList[2]),
+                    easting   : parseInt(valueList[1]),
+                    zoneLetter: parseInt(valueList[0].slice(2)),
+                    zoneNumber: parseInt(valueList[0].slice(0, 2))
+                });
+            return [latlng.lat, latlng.lon];
+        }
+
+    }; //end of window.latLngFormat.formatList[...] =
 
 }(jQuery, this, document));
 ;
 /* @preserve
- * Leaflet 1.3.1, a JS library for interactive maps. http://leafletjs.com
- * (c) 2010-2017 Vladimir Agafonkin, (c) 2010-2011 CloudMade
+ * Leaflet 1.4.0, a JS library for interactive maps. http://leafletjs.com
+ * (c) 2010-2018 Vladimir Agafonkin, (c) 2010-2011 CloudMade
  */
 
 (function (global, factory) {
@@ -11799,7 +13299,7 @@ latlng-format, a class to validate, format, and transform positions (eq. leaflet
 	(factory((global.L = {})));
 }(this, (function (exports) { 'use strict';
 
-var version = "1.3.1";
+var version = "1.4.0";
 
 /*
  * @namespace Util
@@ -13150,7 +14650,7 @@ function toLatLngBounds(a, b) {
  * map.panTo(L.latLng(50, 30));
  * ```
  *
- * Note that `LatLng` does not inherit from Leafet's `Class` object,
+ * Note that `LatLng` does not inherit from Leaflet's `Class` object,
  * which means new classes can't inherit from it, and new methods
  * can't be added to it with the `include` function.
  */
@@ -13712,7 +15212,7 @@ var mobileOpera = mobile && opera;
 var mobileGecko = mobile && gecko;
 
 // @property retina: Boolean
-// `true` for browsers on a high-resolution "retina" screen.
+// `true` for browsers on a high-resolution "retina" screen or on any screen when browser's display zoom is more than 100%.
 var retina = (window.devicePixelRatio || (window.screen.deviceXDPI / window.screen.logicalXDPI)) > 1;
 
 
@@ -13997,6 +15497,384 @@ function removeDoubleTapListener(obj, id) {
 }
 
 /*
+ * @namespace DomUtil
+ *
+ * Utility functions to work with the [DOM](https://developer.mozilla.org/docs/Web/API/Document_Object_Model)
+ * tree, used by Leaflet internally.
+ *
+ * Most functions expecting or returning a `HTMLElement` also work for
+ * SVG elements. The only difference is that classes refer to CSS classes
+ * in HTML and SVG classes in SVG.
+ */
+
+
+// @property TRANSFORM: String
+// Vendor-prefixed transform style name (e.g. `'webkitTransform'` for WebKit).
+var TRANSFORM = testProp(
+	['transform', 'webkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
+
+// webkitTransition comes first because some browser versions that drop vendor prefix don't do
+// the same for the transitionend event, in particular the Android 4.1 stock browser
+
+// @property TRANSITION: String
+// Vendor-prefixed transition style name.
+var TRANSITION = testProp(
+	['webkitTransition', 'transition', 'OTransition', 'MozTransition', 'msTransition']);
+
+// @property TRANSITION_END: String
+// Vendor-prefixed transitionend event name.
+var TRANSITION_END =
+	TRANSITION === 'webkitTransition' || TRANSITION === 'OTransition' ? TRANSITION + 'End' : 'transitionend';
+
+
+// @function get(id: String|HTMLElement): HTMLElement
+// Returns an element given its DOM id, or returns the element itself
+// if it was passed directly.
+function get(id) {
+	return typeof id === 'string' ? document.getElementById(id) : id;
+}
+
+// @function getStyle(el: HTMLElement, styleAttrib: String): String
+// Returns the value for a certain style attribute on an element,
+// including computed values or values set through CSS.
+function getStyle(el, style) {
+	var value = el.style[style] || (el.currentStyle && el.currentStyle[style]);
+
+	if ((!value || value === 'auto') && document.defaultView) {
+		var css = document.defaultView.getComputedStyle(el, null);
+		value = css ? css[style] : null;
+	}
+	return value === 'auto' ? null : value;
+}
+
+// @function create(tagName: String, className?: String, container?: HTMLElement): HTMLElement
+// Creates an HTML element with `tagName`, sets its class to `className`, and optionally appends it to `container` element.
+function create$1(tagName, className, container) {
+	var el = document.createElement(tagName);
+	el.className = className || '';
+
+	if (container) {
+		container.appendChild(el);
+	}
+	return el;
+}
+
+// @function remove(el: HTMLElement)
+// Removes `el` from its parent element
+function remove(el) {
+	var parent = el.parentNode;
+	if (parent) {
+		parent.removeChild(el);
+	}
+}
+
+// @function empty(el: HTMLElement)
+// Removes all of `el`'s children elements from `el`
+function empty(el) {
+	while (el.firstChild) {
+		el.removeChild(el.firstChild);
+	}
+}
+
+// @function toFront(el: HTMLElement)
+// Makes `el` the last child of its parent, so it renders in front of the other children.
+function toFront(el) {
+	var parent = el.parentNode;
+	if (parent && parent.lastChild !== el) {
+		parent.appendChild(el);
+	}
+}
+
+// @function toBack(el: HTMLElement)
+// Makes `el` the first child of its parent, so it renders behind the other children.
+function toBack(el) {
+	var parent = el.parentNode;
+	if (parent && parent.firstChild !== el) {
+		parent.insertBefore(el, parent.firstChild);
+	}
+}
+
+// @function hasClass(el: HTMLElement, name: String): Boolean
+// Returns `true` if the element's class attribute contains `name`.
+function hasClass(el, name) {
+	if (el.classList !== undefined) {
+		return el.classList.contains(name);
+	}
+	var className = getClass(el);
+	return className.length > 0 && new RegExp('(^|\\s)' + name + '(\\s|$)').test(className);
+}
+
+// @function addClass(el: HTMLElement, name: String)
+// Adds `name` to the element's class attribute.
+function addClass(el, name) {
+	if (el.classList !== undefined) {
+		var classes = splitWords(name);
+		for (var i = 0, len = classes.length; i < len; i++) {
+			el.classList.add(classes[i]);
+		}
+	} else if (!hasClass(el, name)) {
+		var className = getClass(el);
+		setClass(el, (className ? className + ' ' : '') + name);
+	}
+}
+
+// @function removeClass(el: HTMLElement, name: String)
+// Removes `name` from the element's class attribute.
+function removeClass(el, name) {
+	if (el.classList !== undefined) {
+		el.classList.remove(name);
+	} else {
+		setClass(el, trim((' ' + getClass(el) + ' ').replace(' ' + name + ' ', ' ')));
+	}
+}
+
+// @function setClass(el: HTMLElement, name: String)
+// Sets the element's class.
+function setClass(el, name) {
+	if (el.className.baseVal === undefined) {
+		el.className = name;
+	} else {
+		// in case of SVG element
+		el.className.baseVal = name;
+	}
+}
+
+// @function getClass(el: HTMLElement): String
+// Returns the element's class.
+function getClass(el) {
+	// Check if the element is an SVGElementInstance and use the correspondingElement instead
+	// (Required for linked SVG elements in IE11.)
+	if (el.correspondingElement) {
+		el = el.correspondingElement;
+	}
+	return el.className.baseVal === undefined ? el.className : el.className.baseVal;
+}
+
+// @function setOpacity(el: HTMLElement, opacity: Number)
+// Set the opacity of an element (including old IE support).
+// `opacity` must be a number from `0` to `1`.
+function setOpacity(el, value) {
+	if ('opacity' in el.style) {
+		el.style.opacity = value;
+	} else if ('filter' in el.style) {
+		_setOpacityIE(el, value);
+	}
+}
+
+function _setOpacityIE(el, value) {
+	var filter = false,
+	    filterName = 'DXImageTransform.Microsoft.Alpha';
+
+	// filters collection throws an error if we try to retrieve a filter that doesn't exist
+	try {
+		filter = el.filters.item(filterName);
+	} catch (e) {
+		// don't set opacity to 1 if we haven't already set an opacity,
+		// it isn't needed and breaks transparent pngs.
+		if (value === 1) { return; }
+	}
+
+	value = Math.round(value * 100);
+
+	if (filter) {
+		filter.Enabled = (value !== 100);
+		filter.Opacity = value;
+	} else {
+		el.style.filter += ' progid:' + filterName + '(opacity=' + value + ')';
+	}
+}
+
+// @function testProp(props: String[]): String|false
+// Goes through the array of style names and returns the first name
+// that is a valid style name for an element. If no such name is found,
+// it returns false. Useful for vendor-prefixed styles like `transform`.
+function testProp(props) {
+	var style = document.documentElement.style;
+
+	for (var i = 0; i < props.length; i++) {
+		if (props[i] in style) {
+			return props[i];
+		}
+	}
+	return false;
+}
+
+// @function setTransform(el: HTMLElement, offset: Point, scale?: Number)
+// Resets the 3D CSS transform of `el` so it is translated by `offset` pixels
+// and optionally scaled by `scale`. Does not have an effect if the
+// browser doesn't support 3D CSS transforms.
+function setTransform(el, offset, scale) {
+	var pos = offset || new Point(0, 0);
+
+	el.style[TRANSFORM] =
+		(ie3d ?
+			'translate(' + pos.x + 'px,' + pos.y + 'px)' :
+			'translate3d(' + pos.x + 'px,' + pos.y + 'px,0)') +
+		(scale ? ' scale(' + scale + ')' : '');
+}
+
+// @function setPosition(el: HTMLElement, position: Point)
+// Sets the position of `el` to coordinates specified by `position`,
+// using CSS translate or top/left positioning depending on the browser
+// (used by Leaflet internally to position its layers).
+function setPosition(el, point) {
+
+	/*eslint-disable */
+	el._leaflet_pos = point;
+	/* eslint-enable */
+
+	if (any3d) {
+		setTransform(el, point);
+	} else {
+		el.style.left = point.x + 'px';
+		el.style.top = point.y + 'px';
+	}
+}
+
+// @function getPosition(el: HTMLElement): Point
+// Returns the coordinates of an element previously positioned with setPosition.
+function getPosition(el) {
+	// this method is only used for elements previously positioned using setPosition,
+	// so it's safe to cache the position for performance
+
+	return el._leaflet_pos || new Point(0, 0);
+}
+
+// @function disableTextSelection()
+// Prevents the user from generating `selectstart` DOM events, usually generated
+// when the user drags the mouse through a page with text. Used internally
+// by Leaflet to override the behaviour of any click-and-drag interaction on
+// the map. Affects drag interactions on the whole document.
+
+// @function enableTextSelection()
+// Cancels the effects of a previous [`L.DomUtil.disableTextSelection`](#domutil-disabletextselection).
+var disableTextSelection;
+var enableTextSelection;
+var _userSelect;
+if ('onselectstart' in document) {
+	disableTextSelection = function () {
+		on(window, 'selectstart', preventDefault);
+	};
+	enableTextSelection = function () {
+		off(window, 'selectstart', preventDefault);
+	};
+} else {
+	var userSelectProperty = testProp(
+		['userSelect', 'WebkitUserSelect', 'OUserSelect', 'MozUserSelect', 'msUserSelect']);
+
+	disableTextSelection = function () {
+		if (userSelectProperty) {
+			var style = document.documentElement.style;
+			_userSelect = style[userSelectProperty];
+			style[userSelectProperty] = 'none';
+		}
+	};
+	enableTextSelection = function () {
+		if (userSelectProperty) {
+			document.documentElement.style[userSelectProperty] = _userSelect;
+			_userSelect = undefined;
+		}
+	};
+}
+
+// @function disableImageDrag()
+// As [`L.DomUtil.disableTextSelection`](#domutil-disabletextselection), but
+// for `dragstart` DOM events, usually generated when the user drags an image.
+function disableImageDrag() {
+	on(window, 'dragstart', preventDefault);
+}
+
+// @function enableImageDrag()
+// Cancels the effects of a previous [`L.DomUtil.disableImageDrag`](#domutil-disabletextselection).
+function enableImageDrag() {
+	off(window, 'dragstart', preventDefault);
+}
+
+var _outlineElement;
+var _outlineStyle;
+// @function preventOutline(el: HTMLElement)
+// Makes the [outline](https://developer.mozilla.org/docs/Web/CSS/outline)
+// of the element `el` invisible. Used internally by Leaflet to prevent
+// focusable elements from displaying an outline when the user performs a
+// drag interaction on them.
+function preventOutline(element) {
+	while (element.tabIndex === -1) {
+		element = element.parentNode;
+	}
+	if (!element.style) { return; }
+	restoreOutline();
+	_outlineElement = element;
+	_outlineStyle = element.style.outline;
+	element.style.outline = 'none';
+	on(window, 'keydown', restoreOutline);
+}
+
+// @function restoreOutline()
+// Cancels the effects of a previous [`L.DomUtil.preventOutline`]().
+function restoreOutline() {
+	if (!_outlineElement) { return; }
+	_outlineElement.style.outline = _outlineStyle;
+	_outlineElement = undefined;
+	_outlineStyle = undefined;
+	off(window, 'keydown', restoreOutline);
+}
+
+// @function getSizedParentNode(el: HTMLElement): HTMLElement
+// Finds the closest parent node which size (width and height) is not null.
+function getSizedParentNode(element) {
+	do {
+		element = element.parentNode;
+	} while ((!element.offsetWidth || !element.offsetHeight) && element !== document.body);
+	return element;
+}
+
+// @function getScale(el: HTMLElement): Object
+// Computes the CSS scale currently applied on the element.
+// Returns an object with `x` and `y` members as horizontal and vertical scales respectively,
+// and `boundingClientRect` as the result of [`getBoundingClientRect()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect).
+function getScale(element) {
+	var rect = element.getBoundingClientRect(); // Read-only in old browsers.
+
+	return {
+		x: rect.width / element.offsetWidth || 1,
+		y: rect.height / element.offsetHeight || 1,
+		boundingClientRect: rect
+	};
+}
+
+
+var DomUtil = (Object.freeze || Object)({
+	TRANSFORM: TRANSFORM,
+	TRANSITION: TRANSITION,
+	TRANSITION_END: TRANSITION_END,
+	get: get,
+	getStyle: getStyle,
+	create: create$1,
+	remove: remove,
+	empty: empty,
+	toFront: toFront,
+	toBack: toBack,
+	hasClass: hasClass,
+	addClass: addClass,
+	removeClass: removeClass,
+	setClass: setClass,
+	getClass: getClass,
+	setOpacity: setOpacity,
+	testProp: testProp,
+	setTransform: setTransform,
+	setPosition: setPosition,
+	getPosition: getPosition,
+	disableTextSelection: disableTextSelection,
+	enableTextSelection: enableTextSelection,
+	disableImageDrag: disableImageDrag,
+	enableImageDrag: enableImageDrag,
+	preventOutline: preventOutline,
+	restoreOutline: restoreOutline,
+	getSizedParentNode: getSizedParentNode,
+	getScale: getScale
+});
+
+/*
  * @namespace DomEvent
  * Utility functions to work with the [DOM events](https://developer.mozilla.org/docs/Web/API/Event), used by Leaflet internally.
  */
@@ -14206,19 +16084,21 @@ function stop(e) {
 
 // @function getMousePosition(ev: DOMEvent, container?: HTMLElement): Point
 // Gets normalized mouse position from a DOM event relative to the
-// `container` or to the whole page if not specified.
+// `container` (border excluded) or to the whole page if not specified.
 function getMousePosition(e, container) {
 	if (!container) {
 		return new Point(e.clientX, e.clientY);
 	}
 
-	var rect = container.getBoundingClientRect();
+	var scale = getScale(container),
+	    offset = scale.boundingClientRect; // left and top  values are in page scale (like the event clientX/Y)
 
-	var scaleX = rect.width / container.offsetWidth || 1;
-	var scaleY = rect.height / container.offsetHeight || 1;
 	return new Point(
-		e.clientX / scaleX - rect.left - container.clientLeft,
-		e.clientY / scaleY - rect.top - container.clientTop);
+		// offset.left/top values are in page scale (like clientX/Y),
+		// whereas clientLeft/Top (border width) values are the original values (before CSS scale applies).
+		(e.clientX - offset.left) / scale.x - container.clientLeft,
+		(e.clientY - offset.top) / scale.y - container.clientTop
+	);
 }
 
 // Chrome on Win scrolls double the pixels as in other platforms (see #4538),
@@ -14314,354 +16194,6 @@ var DomEvent = (Object.freeze || Object)({
 	isExternalTarget: isExternalTarget,
 	addListener: on,
 	removeListener: off
-});
-
-/*
- * @namespace DomUtil
- *
- * Utility functions to work with the [DOM](https://developer.mozilla.org/docs/Web/API/Document_Object_Model)
- * tree, used by Leaflet internally.
- *
- * Most functions expecting or returning a `HTMLElement` also work for
- * SVG elements. The only difference is that classes refer to CSS classes
- * in HTML and SVG classes in SVG.
- */
-
-
-// @property TRANSFORM: String
-// Vendor-prefixed transform style name (e.g. `'webkitTransform'` for WebKit).
-var TRANSFORM = testProp(
-	['transform', 'WebkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
-
-// webkitTransition comes first because some browser versions that drop vendor prefix don't do
-// the same for the transitionend event, in particular the Android 4.1 stock browser
-
-// @property TRANSITION: String
-// Vendor-prefixed transition style name.
-var TRANSITION = testProp(
-	['webkitTransition', 'transition', 'OTransition', 'MozTransition', 'msTransition']);
-
-// @property TRANSITION_END: String
-// Vendor-prefixed transitionend event name.
-var TRANSITION_END =
-	TRANSITION === 'webkitTransition' || TRANSITION === 'OTransition' ? TRANSITION + 'End' : 'transitionend';
-
-
-// @function get(id: String|HTMLElement): HTMLElement
-// Returns an element given its DOM id, or returns the element itself
-// if it was passed directly.
-function get(id) {
-	return typeof id === 'string' ? document.getElementById(id) : id;
-}
-
-// @function getStyle(el: HTMLElement, styleAttrib: String): String
-// Returns the value for a certain style attribute on an element,
-// including computed values or values set through CSS.
-function getStyle(el, style) {
-	var value = el.style[style] || (el.currentStyle && el.currentStyle[style]);
-
-	if ((!value || value === 'auto') && document.defaultView) {
-		var css = document.defaultView.getComputedStyle(el, null);
-		value = css ? css[style] : null;
-	}
-	return value === 'auto' ? null : value;
-}
-
-// @function create(tagName: String, className?: String, container?: HTMLElement): HTMLElement
-// Creates an HTML element with `tagName`, sets its class to `className`, and optionally appends it to `container` element.
-function create$1(tagName, className, container) {
-	var el = document.createElement(tagName);
-	el.className = className || '';
-
-	if (container) {
-		container.appendChild(el);
-	}
-	return el;
-}
-
-// @function remove(el: HTMLElement)
-// Removes `el` from its parent element
-function remove(el) {
-	var parent = el.parentNode;
-	if (parent) {
-		parent.removeChild(el);
-	}
-}
-
-// @function empty(el: HTMLElement)
-// Removes all of `el`'s children elements from `el`
-function empty(el) {
-	while (el.firstChild) {
-		el.removeChild(el.firstChild);
-	}
-}
-
-// @function toFront(el: HTMLElement)
-// Makes `el` the last child of its parent, so it renders in front of the other children.
-function toFront(el) {
-	var parent = el.parentNode;
-	if (parent.lastChild !== el) {
-		parent.appendChild(el);
-	}
-}
-
-// @function toBack(el: HTMLElement)
-// Makes `el` the first child of its parent, so it renders behind the other children.
-function toBack(el) {
-	var parent = el.parentNode;
-	if (parent.firstChild !== el) {
-		parent.insertBefore(el, parent.firstChild);
-	}
-}
-
-// @function hasClass(el: HTMLElement, name: String): Boolean
-// Returns `true` if the element's class attribute contains `name`.
-function hasClass(el, name) {
-	if (el.classList !== undefined) {
-		return el.classList.contains(name);
-	}
-	var className = getClass(el);
-	return className.length > 0 && new RegExp('(^|\\s)' + name + '(\\s|$)').test(className);
-}
-
-// @function addClass(el: HTMLElement, name: String)
-// Adds `name` to the element's class attribute.
-function addClass(el, name) {
-	if (el.classList !== undefined) {
-		var classes = splitWords(name);
-		for (var i = 0, len = classes.length; i < len; i++) {
-			el.classList.add(classes[i]);
-		}
-	} else if (!hasClass(el, name)) {
-		var className = getClass(el);
-		setClass(el, (className ? className + ' ' : '') + name);
-	}
-}
-
-// @function removeClass(el: HTMLElement, name: String)
-// Removes `name` from the element's class attribute.
-function removeClass(el, name) {
-	if (el.classList !== undefined) {
-		el.classList.remove(name);
-	} else {
-		setClass(el, trim((' ' + getClass(el) + ' ').replace(' ' + name + ' ', ' ')));
-	}
-}
-
-// @function setClass(el: HTMLElement, name: String)
-// Sets the element's class.
-function setClass(el, name) {
-	if (el.className.baseVal === undefined) {
-		el.className = name;
-	} else {
-		// in case of SVG element
-		el.className.baseVal = name;
-	}
-}
-
-// @function getClass(el: HTMLElement): String
-// Returns the element's class.
-function getClass(el) {
-	return el.className.baseVal === undefined ? el.className : el.className.baseVal;
-}
-
-// @function setOpacity(el: HTMLElement, opacity: Number)
-// Set the opacity of an element (including old IE support).
-// `opacity` must be a number from `0` to `1`.
-function setOpacity(el, value) {
-	if ('opacity' in el.style) {
-		el.style.opacity = value;
-	} else if ('filter' in el.style) {
-		_setOpacityIE(el, value);
-	}
-}
-
-function _setOpacityIE(el, value) {
-	var filter = false,
-	    filterName = 'DXImageTransform.Microsoft.Alpha';
-
-	// filters collection throws an error if we try to retrieve a filter that doesn't exist
-	try {
-		filter = el.filters.item(filterName);
-	} catch (e) {
-		// don't set opacity to 1 if we haven't already set an opacity,
-		// it isn't needed and breaks transparent pngs.
-		if (value === 1) { return; }
-	}
-
-	value = Math.round(value * 100);
-
-	if (filter) {
-		filter.Enabled = (value !== 100);
-		filter.Opacity = value;
-	} else {
-		el.style.filter += ' progid:' + filterName + '(opacity=' + value + ')';
-	}
-}
-
-// @function testProp(props: String[]): String|false
-// Goes through the array of style names and returns the first name
-// that is a valid style name for an element. If no such name is found,
-// it returns false. Useful for vendor-prefixed styles like `transform`.
-function testProp(props) {
-	var style = document.documentElement.style;
-
-	for (var i = 0; i < props.length; i++) {
-		if (props[i] in style) {
-			return props[i];
-		}
-	}
-	return false;
-}
-
-// @function setTransform(el: HTMLElement, offset: Point, scale?: Number)
-// Resets the 3D CSS transform of `el` so it is translated by `offset` pixels
-// and optionally scaled by `scale`. Does not have an effect if the
-// browser doesn't support 3D CSS transforms.
-function setTransform(el, offset, scale) {
-	var pos = offset || new Point(0, 0);
-
-	el.style[TRANSFORM] =
-		(ie3d ?
-			'translate(' + pos.x + 'px,' + pos.y + 'px)' :
-			'translate3d(' + pos.x + 'px,' + pos.y + 'px,0)') +
-		(scale ? ' scale(' + scale + ')' : '');
-}
-
-// @function setPosition(el: HTMLElement, position: Point)
-// Sets the position of `el` to coordinates specified by `position`,
-// using CSS translate or top/left positioning depending on the browser
-// (used by Leaflet internally to position its layers).
-function setPosition(el, point) {
-
-	/*eslint-disable */
-	el._leaflet_pos = point;
-	/* eslint-enable */
-
-	if (any3d) {
-		setTransform(el, point);
-	} else {
-		el.style.left = point.x + 'px';
-		el.style.top = point.y + 'px';
-	}
-}
-
-// @function getPosition(el: HTMLElement): Point
-// Returns the coordinates of an element previously positioned with setPosition.
-function getPosition(el) {
-	// this method is only used for elements previously positioned using setPosition,
-	// so it's safe to cache the position for performance
-
-	return el._leaflet_pos || new Point(0, 0);
-}
-
-// @function disableTextSelection()
-// Prevents the user from generating `selectstart` DOM events, usually generated
-// when the user drags the mouse through a page with text. Used internally
-// by Leaflet to override the behaviour of any click-and-drag interaction on
-// the map. Affects drag interactions on the whole document.
-
-// @function enableTextSelection()
-// Cancels the effects of a previous [`L.DomUtil.disableTextSelection`](#domutil-disabletextselection).
-var disableTextSelection;
-var enableTextSelection;
-var _userSelect;
-if ('onselectstart' in document) {
-	disableTextSelection = function () {
-		on(window, 'selectstart', preventDefault);
-	};
-	enableTextSelection = function () {
-		off(window, 'selectstart', preventDefault);
-	};
-} else {
-	var userSelectProperty = testProp(
-		['userSelect', 'WebkitUserSelect', 'OUserSelect', 'MozUserSelect', 'msUserSelect']);
-
-	disableTextSelection = function () {
-		if (userSelectProperty) {
-			var style = document.documentElement.style;
-			_userSelect = style[userSelectProperty];
-			style[userSelectProperty] = 'none';
-		}
-	};
-	enableTextSelection = function () {
-		if (userSelectProperty) {
-			document.documentElement.style[userSelectProperty] = _userSelect;
-			_userSelect = undefined;
-		}
-	};
-}
-
-// @function disableImageDrag()
-// As [`L.DomUtil.disableTextSelection`](#domutil-disabletextselection), but
-// for `dragstart` DOM events, usually generated when the user drags an image.
-function disableImageDrag() {
-	on(window, 'dragstart', preventDefault);
-}
-
-// @function enableImageDrag()
-// Cancels the effects of a previous [`L.DomUtil.disableImageDrag`](#domutil-disabletextselection).
-function enableImageDrag() {
-	off(window, 'dragstart', preventDefault);
-}
-
-var _outlineElement;
-var _outlineStyle;
-// @function preventOutline(el: HTMLElement)
-// Makes the [outline](https://developer.mozilla.org/docs/Web/CSS/outline)
-// of the element `el` invisible. Used internally by Leaflet to prevent
-// focusable elements from displaying an outline when the user performs a
-// drag interaction on them.
-function preventOutline(element) {
-	while (element.tabIndex === -1) {
-		element = element.parentNode;
-	}
-	if (!element.style) { return; }
-	restoreOutline();
-	_outlineElement = element;
-	_outlineStyle = element.style.outline;
-	element.style.outline = 'none';
-	on(window, 'keydown', restoreOutline);
-}
-
-// @function restoreOutline()
-// Cancels the effects of a previous [`L.DomUtil.preventOutline`]().
-function restoreOutline() {
-	if (!_outlineElement) { return; }
-	_outlineElement.style.outline = _outlineStyle;
-	_outlineElement = undefined;
-	_outlineStyle = undefined;
-	off(window, 'keydown', restoreOutline);
-}
-
-
-var DomUtil = (Object.freeze || Object)({
-	TRANSFORM: TRANSFORM,
-	TRANSITION: TRANSITION,
-	TRANSITION_END: TRANSITION_END,
-	get: get,
-	getStyle: getStyle,
-	create: create$1,
-	remove: remove,
-	empty: empty,
-	toFront: toFront,
-	toBack: toBack,
-	hasClass: hasClass,
-	addClass: addClass,
-	removeClass: removeClass,
-	setClass: setClass,
-	getClass: getClass,
-	setOpacity: setOpacity,
-	testProp: testProp,
-	setTransform: setTransform,
-	setPosition: setPosition,
-	getPosition: getPosition,
-	disableTextSelection: disableTextSelection,
-	enableTextSelection: enableTextSelection,
-	disableImageDrag: disableImageDrag,
-	enableImageDrag: enableImageDrag,
-	preventOutline: preventOutline,
-	restoreOutline: restoreOutline
 });
 
 /*
@@ -14876,6 +16408,13 @@ var Map = Evented.extend({
 	initialize: function (id, options) { // (HTMLElement or String, Object)
 		options = setOptions(this, options);
 
+		// Make sure to assign internal flags at the beginning,
+		// to avoid inconsistent state in some edge cases.
+		this._handlers = [];
+		this._layers = {};
+		this._zoomBoundLayers = {};
+		this._sizeChanged = true;
+
 		this._initContainer(id);
 		this._initLayout();
 
@@ -14895,11 +16434,6 @@ var Map = Evented.extend({
 		if (options.center && options.zoom !== undefined) {
 			this.setView(toLatLng(options.center), options.zoom, {reset: true});
 		}
-
-		this._handlers = [];
-		this._layers = {};
-		this._zoomBoundLayers = {};
-		this._sizeChanged = true;
 
 		this.callInitHooks();
 
@@ -15259,6 +16793,51 @@ var Map = Evented.extend({
 		return this;
 	},
 
+	// @method panInside(latlng: LatLng, options?: options): this
+	// Pans the map the minimum amount to make the `latlng` visible. Use
+	// `padding`, `paddingTopLeft` and `paddingTopRight` options to fit
+	// the display to more restricted bounds, like [`fitBounds`](#map-fitbounds).
+	// If `latlng` is already within the (optionally padded) display bounds,
+	// the map will not be panned.
+	panInside: function (latlng, options) {
+		options = options || {};
+
+		var paddingTL = toPoint(options.paddingTopLeft || options.padding || [0, 0]),
+		    paddingBR = toPoint(options.paddingBottomRight || options.padding || [0, 0]),
+		    center = this.getCenter(),
+		    pixelCenter = this.project(center),
+		    pixelPoint = this.project(latlng),
+		    pixelBounds = this.getPixelBounds(),
+		    halfPixelBounds = pixelBounds.getSize().divideBy(2),
+		    paddedBounds = toBounds([pixelBounds.min.add(paddingTL), pixelBounds.max.subtract(paddingBR)]);
+
+		if (!paddedBounds.contains(pixelPoint)) {
+			this._enforcingBounds = true;
+			var diff = pixelCenter.subtract(pixelPoint),
+			    newCenter = toPoint(pixelPoint.x + diff.x, pixelPoint.y + diff.y);
+
+			if (pixelPoint.x < paddedBounds.min.x || pixelPoint.x > paddedBounds.max.x) {
+				newCenter.x = pixelCenter.x - diff.x;
+				if (diff.x > 0) {
+					newCenter.x += halfPixelBounds.x - paddingTL.x;
+				} else {
+					newCenter.x -= halfPixelBounds.x - paddingBR.x;
+				}
+			}
+			if (pixelPoint.y < paddedBounds.min.y || pixelPoint.y > paddedBounds.max.y) {
+				newCenter.y = pixelCenter.y - diff.y;
+				if (diff.y > 0) {
+					newCenter.y += halfPixelBounds.y - paddingTL.y;
+				} else {
+					newCenter.y -= halfPixelBounds.y - paddingBR.y;
+				}
+			}
+			this.panTo(this.unproject(newCenter), options);
+			this._enforcingBounds = false;
+		}
+		return this;
+	},
+
 	// @method invalidateSize(options: Zoom/pan options): this
 	// Checks if the map container size changed and updates the map if so —
 	// call it after you've changed the map size dynamically, also animating
@@ -15406,7 +16985,7 @@ var Map = Evented.extend({
 		var lat = pos.coords.latitude,
 		    lng = pos.coords.longitude,
 		    latlng = new LatLng(lat, lng),
-		    bounds = latlng.toBounds(pos.coords.accuracy),
+		    bounds = latlng.toBounds(pos.coords.accuracy * 2),
 		    options = this._locateOptions;
 
 		if (options.setView) {
@@ -15481,6 +17060,10 @@ var Map = Evented.extend({
 
 		if (this._clearControlPos) {
 			this._clearControlPos();
+		}
+		if (this._resizeRequest) {
+			cancelAnimFrame(this._resizeRequest);
+			this._resizeRequest = null;
 		}
 
 		this._clearHandlers();
@@ -15566,7 +17149,7 @@ var Map = Evented.extend({
 			this.options.maxZoom;
 	},
 
-	// @method getBoundsZoom(bounds: LatLngBounds, inside?: Boolean): Number
+	// @method getBoundsZoom(bounds: LatLngBounds, inside?: Boolean, padding?: Point): Number
 	// Returns the maximum zoom level on which the given bounds fit to the map
 	// view in its entirety. If `inside` (optional) is set to `true`, the method
 	// instead returns the minimum zoom level on which the map view fits into
@@ -16373,7 +17956,7 @@ var Map = Evented.extend({
 		}
 
 		// @event zoomanim: ZoomAnimEvent
-		// Fired on every frame of a zoom animation
+		// Fired at least once per zoom animation. For continous zoom, like pinch zooming, fired once per frame during zoom.
 		this.fire('zoomanim', {
 			center: center,
 			zoom: zoom,
@@ -16729,13 +18312,13 @@ var Layers = Control.extend({
 	// Expand the control container if collapsed.
 	expand: function () {
 		addClass(this._container, 'leaflet-control-layers-expanded');
-		this._form.style.height = null;
+		this._section.style.height = null;
 		var acceptableHeight = this._map.getSize().y - (this._container.offsetTop + 50);
-		if (acceptableHeight < this._form.clientHeight) {
-			addClass(this._form, 'leaflet-control-layers-scrollbar');
-			this._form.style.height = acceptableHeight + 'px';
+		if (acceptableHeight < this._section.clientHeight) {
+			addClass(this._section, 'leaflet-control-layers-scrollbar');
+			this._section.style.height = acceptableHeight + 'px';
 		} else {
-			removeClass(this._form, 'leaflet-control-layers-scrollbar');
+			removeClass(this._section, 'leaflet-control-layers-scrollbar');
 		}
 		this._checkDisabledLayers();
 		return this;
@@ -16759,7 +18342,7 @@ var Layers = Control.extend({
 		disableClickPropagation(container);
 		disableScrollPropagation(container);
 
-		var form = this._form = create$1('form', className + '-list');
+		var section = this._section = create$1('section', className + '-list');
 
 		if (collapsed) {
 			this._map.on('click', this.collapse, this);
@@ -16787,11 +18370,11 @@ var Layers = Control.extend({
 			this.expand();
 		}
 
-		this._baseLayersList = create$1('div', className + '-base', form);
-		this._separator = create$1('div', className + '-separator', form);
-		this._overlaysList = create$1('div', className + '-overlays', form);
+		this._baseLayersList = create$1('div', className + '-base', section);
+		this._separator = create$1('div', className + '-separator', section);
+		this._overlaysList = create$1('div', className + '-overlays', section);
 
-		container.appendChild(form);
+		container.appendChild(section);
 	},
 
 	_getLayer: function (id) {
@@ -17128,6 +18711,10 @@ Map.mergeOptions({
 
 Map.addInitHook(function () {
 	if (this.options.zoomControl) {
+		// @section Controls
+		// @property zoomControl: Control.Zoom
+		// The default zoom control (only available if the
+		// [`zoomControl` option](#map-zoomcontrol) was `true` when creating the map).
 		this.zoomControl = new Zoom();
 		this.addControl(this.zoomControl);
 	}
@@ -17567,9 +19154,13 @@ var Draggable = Evented.extend({
 		// Fired when a drag is about to start.
 		this.fire('down');
 
-		var first = e.touches ? e.touches[0] : e;
+		var first = e.touches ? e.touches[0] : e,
+		    sizedParent = getSizedParentNode(this._element);
 
 		this._startPoint = new Point(first.clientX, first.clientY);
+
+		// Cache the scale, so that we can continuously compensate for it during drag (_onMove).
+		this._parentScale = getScale(sizedParent);
 
 		on(document, MOVE[e.type], this._onMove, this);
 		on(document, END[e.type], this._onUp, this);
@@ -17589,11 +19180,16 @@ var Draggable = Evented.extend({
 		}
 
 		var first = (e.touches && e.touches.length === 1 ? e.touches[0] : e),
-		    newPoint = new Point(first.clientX, first.clientY),
-		    offset = newPoint.subtract(this._startPoint);
+		    offset = new Point(first.clientX, first.clientY)._subtract(this._startPoint);
 
 		if (!offset.x && !offset.y) { return; }
 		if (Math.abs(offset.x) + Math.abs(offset.y) < this.options.clickTolerance) { return; }
+
+		// We assume that the parent container's position, border and scale do not change for the duration of the drag.
+		// Therefore there is no need to account for the position and border (they are eliminated by the subtraction)
+		// and we can use the cached value for the scale.
+		offset.x /= this._parentScale.x;
+		offset.y /= this._parentScale.y;
 
 		preventDefault(e);
 
@@ -18203,7 +19799,7 @@ var Layer = Evented.extend({
 		pane: 'overlayPane',
 
 		// @option attribution: String = null
-		// String to be shown in the attribution control, describes the layer data, e.g. "© Mapbox".
+		// String to be shown in the attribution control, e.g. "© OpenStreetMap contributors". It describes the layer data and is often a legal obligation towards copyright holders and tile providers.
 		attribution: null,
 
 		bubblingMouseEvents: true
@@ -18764,7 +20360,7 @@ var Icon = Class.extend({
 
 	options: {
 		popupAnchor: [0, 0],
-		tooltipAnchor: [0, 0],
+		tooltipAnchor: [0, 0]
 	},
 
 	initialize: function (options) {
@@ -18963,7 +20559,7 @@ var MarkerDrag = Handler.extend({
 		    map = marker._map,
 		    speed = this._marker.options.autoPanSpeed,
 		    padding = this._marker.options.autoPanPadding,
-		    iconPos = L.DomUtil.getPosition(marker._icon),
+		    iconPos = getPosition(marker._icon),
 		    bounds = map.getPixelBounds(),
 		    origin = map.getPixelOrigin();
 
@@ -18987,7 +20583,7 @@ var MarkerDrag = Handler.extend({
 			this._draggable._newPos._add(movement);
 			this._draggable._startPos._add(movement);
 
-			L.DomUtil.setPosition(marker._icon, this._draggable._newPos);
+			setPosition(marker._icon, this._draggable._newPos);
 			this._onDrag(e);
 
 			this._panRequest = requestAnimFrame(this._adjustPan.bind(this, e));
@@ -19019,7 +20615,7 @@ var MarkerDrag = Handler.extend({
 	_onDrag: function (e) {
 		var marker = this._marker,
 		    shadow = marker._shadow,
-		iconPos = getPosition(marker._icon),
+		    iconPos = getPosition(marker._icon),
 		    latlng = marker._map.layerPointToLatLng(iconPos);
 
 		// update shadow position
@@ -19080,22 +20676,6 @@ var Marker = Layer.extend({
 		// Option inherited from "Interactive layer" abstract class
 		interactive: true,
 
-		// @option draggable: Boolean = false
-		// Whether the marker is draggable with mouse/touch or not.
-		draggable: false,
-
-		// @option autoPan: Boolean = false
-		// Set it to `true` if you want the map to do panning animation when marker hits the edges.
-		autoPan: false,
-
-		// @option autoPanPadding: Point = Point(50, 50)
-		// Equivalent of setting both top left and bottom right autopan padding to the same value.
-		autoPanPadding: [50, 50],
-
-		// @option autoPanSpeed: Number = 10
-		// Number of pixels the map should move by.
-		autoPanSpeed: 10,
-
 		// @option keyboard: Boolean = true
 		// Whether the marker can be tabbed to with a keyboard and clicked by pressing enter.
 		keyboard: true,
@@ -19131,7 +20711,25 @@ var Marker = Layer.extend({
 		// @option bubblingMouseEvents: Boolean = false
 		// When `true`, a mouse event on this marker will trigger the same event on the map
 		// (unless [`L.DomEvent.stopPropagation`](#domevent-stoppropagation) is used).
-		bubblingMouseEvents: false
+		bubblingMouseEvents: false,
+
+		// @section Draggable marker options
+		// @option draggable: Boolean = false
+		// Whether the marker is draggable with mouse/touch or not.
+		draggable: false,
+
+		// @option autoPan: Boolean = false
+		// Whether to pan the map when dragging this marker near its edge or not.
+		autoPan: false,
+
+		// @option autoPanPadding: Point = Point(50, 50)
+		// Distance (in pixels to the left/right and to the top/bottom) of the
+		// map edge to start panning the map.
+		autoPanPadding: [50, 50],
+
+		// @option autoPanSpeed: Number = 10
+		// Number of pixels the map should pan by.
+		autoPanSpeed: 10
 	},
 
 	/* @section
@@ -19840,7 +21438,7 @@ var Polyline = Path.extend({
 		return !this._latlngs.length;
 	},
 
-	// @method closestLayerPoint: Point
+	// @method closestLayerPoint(p: Point): Point
 	// Returns the point closest to `p` on the Polyline.
 	closestLayerPoint: function (p) {
 		var minDistance = Infinity,
@@ -20233,7 +21831,7 @@ var Polygon = Polyline.extend({
 		var inside = false,
 		    part, p1, p2, i, j, k, len, len2;
 
-		if (!this._pxBounds.contains(p)) { return false; }
+		if (!this._pxBounds || !this._pxBounds.contains(p)) { return false; }
 
 		// ray casting algorithm for detecting if point is in polygon
 		for (i = 0, len = this._parts.length; i < len; i++) {
@@ -20660,7 +22258,7 @@ LayerGroup.include({
 // @namespace GeoJSON
 // @factory L.geoJSON(geojson?: Object, options?: GeoJSON options)
 // Creates a GeoJSON layer. Optionally accepts an object in
-// [GeoJSON format](http://geojson.org/geojson-spec.html) to display on the map
+// [GeoJSON format](https://tools.ietf.org/html/rfc7946) to display on the map
 // (you can alternatively add it later with `addData` method) and an `options` object.
 function geoJSON(geojson, options) {
 	return new GeoJSON(geojson, options);
@@ -20702,8 +22300,10 @@ var ImageOverlay = Layer.extend({
 		// If `true`, the image overlay will emit [mouse events](#interactive-layer) when clicked or hovered.
 		interactive: false,
 
-		// @option crossOrigin: Boolean = false
-		// If true, the image will have its crossOrigin attribute set to ''. This is needed if you want to access image pixel data.
+		// @option crossOrigin: Boolean|String = false
+		// Whether the crossOrigin attribute will be added to the image.
+		// If a String is provided, the image will have its crossOrigin attribute set to the String provided. This is needed if you want to access image pixel data.
+		// Refer to [CORS Settings](https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_settings_attributes) for valid String values.
 		crossOrigin: false,
 
 		// @option errorOverlayUrl: String = ''
@@ -20711,12 +22311,12 @@ var ImageOverlay = Layer.extend({
 		errorOverlayUrl: '',
 
 		// @option zIndex: Number = 1
-		// The explicit [zIndex](https://developer.mozilla.org/docs/Web/CSS/CSS_Positioning/Understanding_z_index) of the tile layer.
+		// The explicit [zIndex](https://developer.mozilla.org/docs/Web/CSS/CSS_Positioning/Understanding_z_index) of the overlay layer.
 		zIndex: 1,
 
 		// @option className: String = ''
 		// A custom class name to assign to the image. Empty by default.
-		className: '',
+		className: ''
 	},
 
 	initialize: function (url, bounds, options) { // (String, LatLngBounds, Object)
@@ -20822,7 +22422,7 @@ var ImageOverlay = Layer.extend({
 		return events;
 	},
 
-	// @method: setZIndex(value: Number) : this
+	// @method setZIndex(value: Number): this
 	// Changes the [zIndex](#imageoverlay-zindex) of the image overlay.
 	setZIndex: function (value) {
 		this.options.zIndex = value;
@@ -20859,8 +22459,8 @@ var ImageOverlay = Layer.extend({
 		img.onload = bind(this.fire, this, 'load');
 		img.onerror = bind(this._overlayOnError, this, 'error');
 
-		if (this.options.crossOrigin) {
-			img.crossOrigin = '';
+		if (this.options.crossOrigin || this.options.crossOrigin === '') {
+			img.crossOrigin = this.options.crossOrigin === true ? '' : this.options.crossOrigin;
 		}
 
 		if (this.options.zIndex) {
@@ -20908,7 +22508,7 @@ var ImageOverlay = Layer.extend({
 
 	_overlayOnError: function () {
 		// @event error: Event
-		// Fired when the ImageOverlay layer has loaded its image
+		// Fired when the ImageOverlay layer fails to load its image
 		this.fire('error');
 
 		var errorUrl = this.options.errorOverlayUrl;
@@ -20941,7 +22541,7 @@ var imageOverlay = function (url, bounds, options) {
  * ```js
  * var videoUrl = 'https://www.mapbox.com/bites/00188/patricia_nasa.webm',
  * 	videoBounds = [[ 32, -130], [ 13, -100]];
- * L.VideoOverlay(videoUrl, videoBounds ).addTo(map);
+ * L.videoOverlay(videoUrl, videoBounds ).addTo(map);
  * ```
  */
 
@@ -21434,7 +23034,8 @@ var Popup = DivOverlay.extend({
 	},
 
 	_adjustPan: function () {
-		if (!this.options.autoPan || (this._map._panAnim && this._map._panAnim._inProgress)) { return; }
+		if (!this.options.autoPan) { return; }
+		if (this._map._panAnim) { this._map._panAnim.stop(); }
 
 		var map = this._map,
 		    marginBottom = parseInt(getStyle(this._container, 'marginBottom'), 10) || 0,
@@ -22968,12 +24569,6 @@ var GridLayer = Layer.extend({
 		var tile = this._tiles[key];
 		if (!tile) { return; }
 
-		// Cancels any pending http requests associated with the tile
-		// unless we're on Android's stock browser,
-		// see https://github.com/Leaflet/Leaflet/issues/137
-		if (!androidStock) {
-			tile.el.setAttribute('src', emptyImageUrl);
-		}
 		remove(tile.el);
 
 		delete this._tiles[key];
@@ -23042,8 +24637,6 @@ var GridLayer = Layer.extend({
 	},
 
 	_tileReady: function (coords, err, tile) {
-		if (!this._map) { return; }
-
 		if (err) {
 			// @event tileerror: TileErrorEvent
 			// Fired when there is an error loading a tile.
@@ -23133,12 +24726,12 @@ function gridLayer(options) {
  * @class TileLayer
  * @inherits GridLayer
  * @aka L.TileLayer
- * Used to load and display tile layers on the map. Extends `GridLayer`.
+ * Used to load and display tile layers on the map. Note that most tile servers require attribution, which you can set under `Layer`. Extends `GridLayer`.
  *
  * @example
  *
  * ```js
- * L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?{foo}', {foo: 'bar'}).addTo(map);
+ * L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?{foo}', {foo: 'bar', attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'}).addTo(map);
  * ```
  *
  * @section URL template
@@ -23197,8 +24790,10 @@ var TileLayer = GridLayer.extend({
 		// If `true` and user is on a retina display, it will request four tiles of half the specified size and a bigger zoom level in place of one to utilize the high resolution.
 		detectRetina: false,
 
-		// @option crossOrigin: Boolean = false
-		// If true, all tiles will have their crossOrigin attribute set to ''. This is needed if you want to access tile pixel data.
+		// @option crossOrigin: Boolean|String = false
+		// Whether the crossOrigin attribute will be added to the tiles.
+		// If a String is provided, all tiles will have their crossOrigin attribute set to the String provided. This is needed if you want to access tile pixel data.
+		// Refer to [CORS Settings](https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_settings_attributes) for valid String values.
 		crossOrigin: false
 	},
 
@@ -23236,7 +24831,13 @@ var TileLayer = GridLayer.extend({
 
 	// @method setUrl(url: String, noRedraw?: Boolean): this
 	// Updates the layer's URL template and redraws it (unless `noRedraw` is set to `true`).
+	// If the URL does not change, the layer will not be redrawn unless
+	// the noRedraw parameter is set to false.
 	setUrl: function (url, noRedraw) {
+		if (this._url === url && noRedraw === undefined) {
+			noRedraw = true;
+		}
+
 		this._url = url;
 
 		if (!noRedraw) {
@@ -23255,8 +24856,8 @@ var TileLayer = GridLayer.extend({
 		on(tile, 'load', bind(this._tileOnLoad, this, done, tile));
 		on(tile, 'error', bind(this._tileOnError, this, done, tile));
 
-		if (this.options.crossOrigin) {
-			tile.crossOrigin = '';
+		if (this.options.crossOrigin || this.options.crossOrigin === '') {
+			tile.crossOrigin = this.options.crossOrigin === true ? '' : this.options.crossOrigin;
 		}
 
 		/*
@@ -23357,6 +24958,28 @@ var TileLayer = GridLayer.extend({
 				}
 			}
 		}
+	},
+
+	_removeTile: function (key) {
+		var tile = this._tiles[key];
+		if (!tile) { return; }
+
+		// Cancels any pending http requests associated with the tile
+		// unless we're on Android's stock browser,
+		// see https://github.com/Leaflet/Leaflet/issues/137
+		if (!androidStock) {
+			tile.el.setAttribute('src', emptyImageUrl);
+		}
+
+		return GridLayer.prototype._removeTile.call(this, key);
+	},
+
+	_tileReady: function (coords, err, tile) {
+		if (!this._map || (tile && tile.getAttribute('src') === emptyImageUrl)) {
+			return;
+		}
+
+		return GridLayer.prototype._tileReady.call(this, coords, err, tile);
 	}
 });
 
@@ -23473,7 +25096,7 @@ var TileLayerWMS = TileLayer.extend({
 		    bbox = (this._wmsVersion >= 1.3 && this._crs === EPSG4326 ?
 		    [min.y, min.x, max.y, max.x] :
 		    [min.x, min.y, max.x, max.y]).join(','),
-		url = L.TileLayer.prototype.getTileUrl.call(this, coords);
+		    url = TileLayer.prototype.getTileUrl.call(this, coords);
 		return url +
 			getParamString(this.wmsParams, url, this.options.uppercase) +
 			(this.options.uppercase ? '&BBOX=' : '&bbox=') + bbox;
@@ -23699,6 +25322,7 @@ var Canvas = Renderer.extend({
 	},
 
 	_destroyContainer: function () {
+		cancelAnimFrame(this._redrawRequest);
 		delete this._ctx;
 		remove(this._container);
 		off(this._container);
@@ -23719,8 +25343,6 @@ var Canvas = Renderer.extend({
 
 	_update: function () {
 		if (this._map._animatingZoom && this._bounds) { return; }
-
-		this._drawnLayers = {};
 
 		Renderer.prototype._update.call(this);
 
@@ -23793,7 +25415,7 @@ var Canvas = Renderer.extend({
 
 		delete layer._order;
 
-		delete this._layers[L.stamp(layer)];
+		delete this._layers[stamp(layer)];
 
 		this._requestRedraw(layer);
 	},
@@ -23815,14 +25437,20 @@ var Canvas = Renderer.extend({
 	},
 
 	_updateDashArray: function (layer) {
-		if (layer.options.dashArray) {
-			var parts = layer.options.dashArray.split(','),
+		if (typeof layer.options.dashArray === 'string') {
+			var parts = layer.options.dashArray.split(/[, ]+/),
 			    dashArray = [],
+			    dashValue,
 			    i;
 			for (i = 0; i < parts.length; i++) {
-				dashArray.push(Number(parts[i]));
+				dashValue = Number(parts[i]);
+				// Ignore dash array containing invalid lengths
+				if (isNaN(dashValue)) { return; }
+				dashArray.push(dashValue);
 			}
 			layer.options._dashArray = dashArray;
+		} else {
+			layer.options._dashArray = layer.options.dashArray;
 		}
 	},
 
@@ -23900,8 +25528,6 @@ var Canvas = Renderer.extend({
 
 		if (!len) { return; }
 
-		this._drawnLayers[layer._leaflet_id] = layer;
-
 		ctx.beginPath();
 
 		for (i = 0; i < len; i++) {
@@ -23927,8 +25553,6 @@ var Canvas = Renderer.extend({
 		    ctx = this._ctx,
 		    r = Math.max(Math.round(layer._radius), 1),
 		    s = (Math.max(Math.round(layer._radiusY), 1) || r) / r;
-
-		this._drawnLayers[layer._leaflet_id] = layer;
 
 		if (s !== 1) {
 			ctx.save();
@@ -24034,6 +25658,9 @@ var Canvas = Renderer.extend({
 
 	_bringToFront: function (layer) {
 		var order = layer._order;
+
+		if (!order) { return; }
+
 		var next = order.next;
 		var prev = order.prev;
 
@@ -24062,6 +25689,9 @@ var Canvas = Renderer.extend({
 
 	_bringToBack: function (layer) {
 		var order = layer._order;
+
+		if (!order) { return; }
+
 		var next = order.next;
 		var prev = order.prev;
 
@@ -24117,7 +25747,6 @@ var vmlCreate = (function () {
 /*
  * @class SVG
  *
- * Although SVG is not available on IE7 and IE8, these browsers support [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language), and the SVG renderer will fall back to VML in this case.
  *
  * VML was deprecated in 2012, which means VML functionality exists only for backwards compatibility
  * with old versions of Internet Explorer.
@@ -24459,10 +26088,7 @@ Map.include({
 		var renderer = layer.options.renderer || this._getPaneRenderer(layer.options.pane) || this.options.renderer || this._renderer;
 
 		if (!renderer) {
-			// @namespace Map; @option preferCanvas: Boolean = false
-			// Whether `Path`s should be rendered on a `Canvas` renderer.
-			// By default, all `Path`s are rendered in a `SVG` renderer.
-			renderer = this._renderer = (this.options.preferCanvas && canvas$1()) || svg$1();
+			renderer = this._renderer = this._createRenderer();
 		}
 
 		if (!this.hasLayer(renderer)) {
@@ -24478,10 +26104,17 @@ Map.include({
 
 		var renderer = this._paneRenderers[name];
 		if (renderer === undefined) {
-			renderer = (SVG && svg$1({pane: name})) || (Canvas && canvas$1({pane: name}));
+			renderer = this._createRenderer({pane: name});
 			this._paneRenderers[name] = renderer;
 		}
 		return renderer;
+	},
+
+	_createRenderer: function (options) {
+		// @namespace Map; @option preferCanvas: Boolean = false
+		// Whether `Path`s should be rendered on a `Canvas` renderer.
+		// By default, all `Path`s are rendered in a `SVG` renderer.
+		return (this.options.preferCanvas && canvas$1(options)) || svg$1(options);
 	}
 });
 
@@ -25116,20 +26749,18 @@ var Keyboard = Handler.extend({
 		    offset;
 
 		if (key in this._panKeys) {
+			if (!map._panAnim || !map._panAnim._inProgress) {
+				offset = this._panKeys[key];
+				if (e.shiftKey) {
+					offset = toPoint(offset).multiplyBy(3);
+				}
 
-			if (map._panAnim && map._panAnim._inProgress) { return; }
+				map.panBy(offset);
 
-			offset = this._panKeys[key];
-			if (e.shiftKey) {
-				offset = toPoint(offset).multiplyBy(3);
+				if (map.options.maxBounds) {
+					map.panInsideBounds(map.options.maxBounds);
+				}
 			}
-
-			map.panBy(offset);
-
-			if (map.options.maxBounds) {
-				map.panInsideBounds(map.options.maxBounds);
-			}
-
 		} else if (key in this._zoomKeys) {
 			map.setZoom(map.getZoom() + (e.shiftKey ? 3 : 1) * this._zoomKeys[key]);
 
@@ -25497,21 +27128,9 @@ Map.ScrollWheelZoom = ScrollWheelZoom;
 Map.Tap = Tap;
 Map.TouchZoom = TouchZoom;
 
-// misc
-
-var oldL = window.L;
-function noConflict() {
-	window.L = oldL;
-	return this;
-}
-
-// Always export us to window global (see #2364)
-window.L = exports;
-
 Object.freeze = freeze;
 
 exports.version = version;
-exports.noConflict = noConflict;
 exports.Control = Control;
 exports.control = control;
 exports.Browser = Browser;
@@ -25587,6 +27206,15 @@ exports.Rectangle = Rectangle;
 exports.rectangle = rectangle;
 exports.Map = Map;
 exports.map = createMap;
+
+var oldL = window.L;
+exports.noConflict = function() {
+	window.L = oldL;
+	return this;
+}
+
+// Always export us to window global (see #2364)
+window.L = exports;
 
 })));
 //# sourceMappingURL=leaflet-src.js.map

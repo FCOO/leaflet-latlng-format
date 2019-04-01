@@ -10,6 +10,10 @@
 	<meta name='owner' content='FCOO'>
 
   <link  href="bower_components.css" rel="stylesheet">
+  <style>
+        #map { cursor: default; }
+  </style>
+
 </head>
 
 <body>
@@ -17,6 +21,11 @@
 	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_DMSS );">Formast DMSs (N65&deg;30'15.3")</button>
 	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_SMM  );">Format DMm (N65&deg;30.258')</button>
 	<button onClick="L.LatLng.setFormat( latLngFormat.LATLNGFORMAT_DD   );">Format Dd (N41.1234&deg;)</button>
+    <br>
+	<button onClick="L.LatLng.setFormat(latLngFormat.LATLNGFORMAT_UTM   );">Format UTM (29Q 286657 2492164)</button>
+	<button onClick="L.LatLng.setFormat(latLngFormat.LATLNGFORMAT_MGRS   );">Format MGRS (02U PG 03727 09686)</button>
+	<button onClick="L.LatLng.setFormat(latLngFormat.LATLNGFORMAT_NAC   );">Format NAC (HBV6R RG77T)</button>
+
 
 
 	<script src="bower_components.js"></script>
@@ -35,10 +44,8 @@
 				.setLatLng(e.latlng)
 				.setContent('You clicked the map at <br>'+
                             'toString= <code>' + e.latlng.toString()+'</code><br>' +
-                            '<code>formatLat()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLat()+'</code><br>' +
-                            '<code>formatTruncLat()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatTruncLat()+'</code><br>' +
-                            '<code>formatLng()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatLng()+'</code><br>' +
-                            '<code>formatTruncLng()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatTruncLng()+'</code>'
+                            '<code>format()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.format()+'</code><br>' +
+                            '<code>formatTrunc()= </code><code style="padding:2px; background-color:gray; color:white">'+e.latlng.formatTrunc()+'</code>'
                             )
 			.openOn(map);
 		}
